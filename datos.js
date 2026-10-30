@@ -37,7 +37,7 @@ window.SITIO = {
   /* ---------- herramientas ----------
      Cambia `mostrar` a false para sacar alguna de la página. */
   apps: [
-    { nombre: "Cotizador de muebles", url: "https://muebles.cvargas.org",
+    { nombre: "Cotizador de muebles", url: "muebles/",
       texto: "Calcula el precio, el despiece y la lista de compra desde las medidas del mueble.",
       mostrar: true },
     { nombre: "Cotizador de vidriería", url: "https://cvargas-bubba.github.io/cotizador-vidrieria/",

@@ -59,6 +59,23 @@ va sobre papel blanco. Se carga una vez en el cotizador, en **Empresa → Logo**
 y queda guardado en ese navegador. Se puede descargar desde
 <https://cvargas.org/marca/logo-fierro-veta.jpg>.
 
+## Módulos
+
+Cada módulo vive en una carpeta y se sirve como ruta del mismo dominio:
+
+| Carpeta | Dirección |
+|---|---|
+| `/` | cvargas.org |
+| `muebles/` | cvargas.org/muebles |
+
+Los módulos nuevos van igual: una carpeta más, y una entrada en `apps` dentro
+de `datos.js` para que aparezcan en la página. Un solo repositorio, un solo
+certificado y un solo despliegue; la contra es que un cambio en cualquier
+módulo reconstruye el sitio entero.
+
+Las rutas distinguen mayúsculas: `cvargas.org/muebles` funciona y
+`cvargas.org/Muebles` no. Por eso van en minúscula.
+
 ## Publicación
 
 GitHub Pages, en el dominio `cvargas.org`. Cada cambio que se sube a `main` se
