@@ -33,8 +33,12 @@
     a.textContent = S.email;
     a.hidden = false;
   }
+  /* Sin ningún medio de contacto, la sección queda con el cotizador como
+     única acción. El aviso va a la consola: es para quien edita el sitio,
+     no para quien lo visita. */
   if (!tel && !S.email) {
-    $("contactoTexto").textContent = "Agrega tu teléfono en datos.js para que aparezca el botón de WhatsApp.";
+    $("cotizaContacto").hidden = false;
+    console.info("Sitio: falta el teléfono en datos.js, por eso no aparecen los botones de WhatsApp.");
   }
 
   /* ---------- trabajos ----------
