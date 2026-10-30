@@ -5,16 +5,18 @@
 window.SITIO = {
 
   /* ---------- quién eres ---------- */
-  nombre: "Taller Cvargas",            // el nombre que va arriba y en la pestaña
-  oficio: "Muebles a medida",          // la línea chica al lado del nombre
-  titular: "Muebles a medida, hechos en madera y fierro",
-  bajada: "Trabajo cada mueble a la medida del espacio: cocinas, closets, " +
-          "libreros y mesones de madera maciza. Cuéntame qué necesitas y lo cotizamos.",
+  nombre: "Fierro & Veta",             // el nombre que va arriba y en la pestaña
+  oficio: "Muebles a pedido",          // la línea chica al lado del nombre
+  logo: "marca/fv-monograma.png",      // deja "" si prefieres solo el nombre escrito
+  titular: "Muebles a pedido, en madera y fierro",
+  bajada: "Cada mueble se hace a la medida del espacio: cocinas, closets, " +
+          "libreros y mesones de madera maciza, con estructura de fierro cuando " +
+          "el trabajo lo pide. Cuéntame qué necesitas y lo cotizamos.",
 
   /* ---------- contacto ----------
      El teléfono va en formato internacional, sin + ni espacios: 56912345678
      Mientras esté vacío, los botones de WhatsApp no aparecen. */
-  telefono: "",
+  telefono: "56993304609",
   mensaje: "Hola, vi tu página y quiero cotizar un mueble.",
   email: "",                           // opcional, déjalo vacío si no quieres publicarlo
   zona: "",                            // opcional: "Santiago y alrededores"

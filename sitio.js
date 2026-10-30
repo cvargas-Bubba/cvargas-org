@@ -10,6 +10,10 @@
   document.title = nombre + (S.oficio ? " · " + S.oficio : "");
   $("marcaNombre").textContent = nombre;
   $("marcaOficio").textContent = S.oficio || "";
+  if (S.logo) {
+    const l = $("marcaLogo");
+    l.src = S.logo; l.alt = nombre; l.hidden = false;
+  }
   $("pieNombre").textContent = nombre;
   $("titular").textContent = S.titular || nombre;
   $("bajada").textContent = S.bajada || "";

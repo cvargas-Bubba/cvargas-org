@@ -46,6 +46,18 @@ Cambia su `mostrar` a `false`.
 | `index.html` | estructura |
 | `estilos.css` | estilos |
 | `fotos/` | las imágenes de los trabajos |
+| `marca/` | el logo: monograma recortado para la web y logo completo para el PDF |
+
+## El logo
+
+`marca/fv-monograma.png` es el monograma con fondo transparente, que es el que
+va en el encabezado: el logo completo viene sobre blanco y en un sitio oscuro
+se vería como un recuadro.
+
+`marca/logo-fierro-veta.jpg` es el logo entero, para el PDF del cotizador, que
+va sobre papel blanco. Se carga una vez en el cotizador, en **Empresa → Logo**,
+y queda guardado en ese navegador. Se puede descargar desde
+<https://cvargas.org/marca/logo-fierro-veta.jpg>.
 
 ## Publicación
 

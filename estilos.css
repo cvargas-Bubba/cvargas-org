@@ -41,7 +41,9 @@ a { color: inherit; }
   max-width: 1120px; margin: 0 auto; padding: 12px 24px;
   display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
 }
-.marca { display: flex; align-items: baseline; gap: 9px; text-decoration: none; }
+.marca { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.marca-logo { height: 42px; width: auto; }
+.marca-txt { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
 .marca-n { font: 700 23px/1 var(--cond); letter-spacing: .5px; text-transform: uppercase; }
 .marca-o { font: 600 12px/1 var(--cond); letter-spacing: 1.5px; text-transform: uppercase; color: var(--acento); }
 .nav { display: flex; gap: 6px; flex-wrap: wrap; }
