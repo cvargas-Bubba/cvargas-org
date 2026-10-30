@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Cotizador de muebles a medida: calcula precio, despiece y lista de compra a partir de las medidas.">
+<title>Cotizador de Muebles</title>
+<meta name="theme-color" content="#14110F">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Source+Sans+3:wght@400;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+<style>[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <span class="brand-name" id="brandName">Mi Mueblería</span>
+      <span class="brand-tag">Cotizador</span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Secciones">
+      <button class="tab" role="tab" data-view="cotizar" aria-selected="true">Cotizar</button>
+      <button class="tab" role="tab" data-view="croquis" aria-selected="false">Croquis</button>
+      <button class="tab" role="tab" data-view="historial" aria-selected="false">Historial</button>
+      <button class="tab" role="tab" data-view="materiales" aria-selected="false">Materiales</button>
+      <button class="tab" role="tab" data-view="empresa" aria-selected="false">Empresa</button>
+    </nav>
+    <span class="sync">Guardado en este equipo</span>
+  </div>
+</header>
+
+<!-- ============ COTIZAR ============ -->
+<main class="view" id="view-cotizar">
+  <div class="workspace">
+    <section class="panel" aria-labelledby="cfgTitle">
+      <div class="panel-h">
+        <h2 class="h-label" id="cfgTitle">Agregar mueble</h2>
+        <button class="btn btn-ghost btn-sm" id="cancelEdit" hidden>Cancelar edición</button>
+      </div>
+      <div class="panel-b">
+        <div class="tipos" id="tipos" role="group" aria-label="Tipo de mueble"></div>
+
+        <div class="config-grid">
+          <div class="fields">
+            <div class="field full">
+              <label for="fNombre">Nombre del mueble <span class="opt">opcional</span></label>
+              <input class="input" id="fNombre" placeholder="Ej.: mueble bajo lavaplatos" autocomplete="off">
+            </div>
+
+            <div class="field"><label for="fAncho">Ancho</label><div class="unit" data-unit="mm"><input class="input" id="fAncho" inputmode="numeric"></div></div>
+            <div class="field" data-parte="alto"><label for="fAlto">Alto</label><div class="unit" data-unit="mm"><input class="input" id="fAlto" inputmode="numeric"></div></div>
+            <div class="field"><label for="fProf">Profundidad</label><div class="unit" data-unit="mm"><input class="input" id="fProf" inputmode="numeric"></div></div>
+
+            <div class="field" data-parte="puertas"><label for="fPuertas">Puertas</label><input class="input" id="fPuertas" inputmode="numeric"></div>
+            <div class="field" data-parte="cajones"><label for="fCajones">Cajones</label><input class="input" id="fCajones" inputmode="numeric"></div>
+            <div class="field" data-parte="entrepanos"><label for="fEntrepanos">Entrepaños</label><input class="input" id="fEntrepanos" inputmode="numeric"></div>
+
+            <div class="checks full">
+              <label class="check" data-parte="cajonCol"><input type="checkbox" id="fCajonCol"><span>Cajones en columna propia</span></label>
+              <label class="check" data-parte="trasera"><input type="checkbox" id="fTrasera"><span>Trasera</span></label>
+              <label class="check" data-parte="zocalo"><input type="checkbox" id="fZocalo"><span>Zócalo</span></label>
+              <label class="check" data-parte="cubierta"><input type="checkbox" id="fCubierta"><span>Cubierta</span></label>
+              <label class="check" data-parte="barra"><input type="checkbox" id="fBarra"><span>Barra de colgar</span></label>
+              <label class="check"><input type="checkbox" id="fInstalar"><span>Instalación en obra</span></label>
+            </div>
+
+            <div class="field full mat-h"><span class="h-label">Materiales</span></div>
+            <div class="field"><label for="fMatCuerpo">Cuerpo</label><select class="select" id="fMatCuerpo"></select></div>
+            <div class="field" data-parte="frente"><label for="fMatFrente">Frentes y cubiertas</label><select class="select" id="fMatFrente"></select></div>
+            <div class="field" data-parte="trasera"><label for="fMatTrasera">Trasera y pisos de cajón</label><select class="select" id="fMatTrasera"></select></div>
+            <div class="field" data-parte="cajones"><label for="fMatCajon">Caja del cajón</label><select class="select" id="fMatCajon"></select></div>
+            <div class="field" data-parte="matcubierta"><label for="fMatCubierta">Cubierta</label><select class="select" id="fMatCubierta"></select></div>
+          </div>
+
+          <figure class="drawing">
+            <div class="drawing-h">
+              <span class="h-label">Esquema</span>
+              <span class="mono">vista frontal</span>
+            </div>
+            <div class="drawing-svg" id="esquema"></div>
+            <dl class="measures" id="resumenPiezas"></dl>
+          </figure>
+        </div>
+
+        <section class="lineales" aria-labelledby="linTitle">
+          <div class="lineales-h">
+            <span class="h-label" id="linTitle">Madera y perfiles</span>
+            <div class="lineales-btns">
+              <button type="button" class="btn btn-ghost btn-sm" data-add-lineal="madera">Agregar madera</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-add-lineal="perfil">Agregar perfil</button>
+            </div>
+          </div>
+          <p class="hint" id="linAyuda">Piezas que compras por metro: escuadría, largo de cada pieza y cuántas van.</p>
+          <div id="lineales"></div>
+        </section>
+      </div>
+
+      <div class="line-total">
+        <div>
+          <div class="price-big" id="precioUnit">$0</div>
+          <div class="breakdown" id="desglose"></div>
+        </div>
+        <div class="line-actions">
+          <div class="qty" aria-label="Cantidad">
+            <button type="button" id="qtyMinus" aria-label="Restar uno">−</button>
+            <input id="fCantidad" inputmode="numeric" value="1" aria-label="Cantidad">
+            <button type="button" id="qtyPlus" aria-label="Sumar uno">+</button>
+          </div>
+          <button class="btn btn-primary" id="addItem">Agregar a la cotización</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="quote-col" aria-label="Cotización">
+      <article class="sheet">
+        <div class="sheet-head">
+          <div class="sheet-top">
+            <div class="sheet-company" id="sheetCompany"></div>
+            <div class="sheet-no">
+              <div class="k">Cotización</div>
+              <div class="v" id="quoteNo">N° —</div>
+              <div class="d" id="quoteDate"></div>
+            </div>
+          </div>
+          <div class="client-toggle">
+            <div class="client-sum" id="clientSum"></div>
+            <button class="btn btn-ghost btn-sm" id="clientEdit" aria-expanded="false" aria-controls="clientForm">Datos del cliente</button>
+          </div>
+          <div class="client-form" id="clientForm" hidden>
+            <div class="field"><label for="cNombre">Nombre o razón social</label><input class="input" id="cNombre" autocomplete="off"></div>
+            <div class="row2">
+              <div class="field"><label for="cRut">RUT</label><input class="input" id="cRut" autocomplete="off"></div>
+              <div class="field"><label for="cTelefono">Teléfono</label><input class="input" id="cTelefono" inputmode="tel" autocomplete="off"></div>
+            </div>
+            <div class="field"><label for="cEmail">Correo</label><input class="input" id="cEmail" type="email" autocomplete="off"></div>
+            <div class="field"><label for="cObra">Obra / dirección</label><input class="input" id="cObra" autocomplete="off"></div>
+          </div>
+        </div>
+
+        <ul class="items" id="items"></ul>
+
+        <div class="desc-row">
+          <label for="qDescuento">Descuento</label>
+          <div class="unit" data-unit="%"><input class="input" id="qDescuento" inputmode="decimal" value="0"></div>
+        </div>
+        <div class="totals" id="totales"></div>
+
+        <div class="sheet-notes">
+          <div class="field"><label for="qNotas">Notas para el cliente</label><textarea class="textarea" id="qNotas" placeholder="Ej.: incluye retiro de muebles antiguos"></textarea></div>
+        </div>
+      </article>
+
+      <div class="status-row">
+        <div class="field inline">
+          <label for="qEstado">Estado</label>
+          <select class="select pill-select" id="qEstado">
+            <option value="borrador">Borrador</option>
+            <option value="enviada">Enviada</option>
+            <option value="aceptada">Aceptada</option>
+            <option value="rechazada">Rechazada</option>
+          </select>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btnNew">Nueva cotización</button>
+      </div>
+
+      <div class="quote-actions">
+        <button class="btn btn-primary" id="btnSave">Guardar cotización</button>
+        <button class="btn" id="btnPdf">PDF cotización</button>
+        <button class="btn" id="btnDespiece">Ver despiece</button>
+        <button class="btn" id="btnWhats">Enviar por WhatsApp</button>
+        <button class="btn" id="btnShare">Copiar resumen</button>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<div class="mobile-bar" id="mobileBar">
+  <div>
+    <div class="k" id="mbCount">0 muebles</div>
+    <div class="v" id="mbTotal">$0</div>
+  </div>
+  <button class="btn btn-primary" id="mbGo">Ver cotización</button>
+</div>
+
+<!-- ============ CROQUIS ============ -->
+<main class="view" id="view-croquis" hidden>
+  <div class="settings-intro">
+    <div>
+      <h1 class="h-big">Croquis de la cotización</h1>
+      <p>Un dibujo acotado que acompaña a la cotización y sale en el PDF, después de los esquemas. Se guarda junto con la cotización.</p>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="panel-h">
+      <div class="tools" role="group" aria-label="Herramienta">
+        <button type="button" class="tool on" data-tool="sel" title="Seleccionar y mover">Seleccionar</button>
+        <button type="button" class="tool" data-tool="linea" title="Línea recta">Línea</button>
+        <button type="button" class="tool" data-tool="rect" title="Rectángulo">Rectángulo</button>
+        <button type="button" class="tool" data-tool="rombo" title="Rombo">Rombo</button>
+        <button type="button" class="tool" data-tool="poli" title="Figura de varios puntos">Multipunto</button>
+        <button type="button" class="tool" data-tool="texto" title="Rótulo de texto">Texto</button>
+        <button type="button" class="tool" data-tool="cota" title="Cota con medida">Cota</button>
+      </div>
+      <div class="tools-right">
+        <button class="btn btn-ghost btn-sm" id="crEdit">Editar texto</button>
+        <button class="btn btn-ghost btn-sm" id="crUndo">Deshacer</button>
+        <button class="btn btn-ghost btn-sm" id="crDel">Borrar</button>
+        <button class="btn btn-ghost btn-sm" id="crClear">Limpiar</button>
+      </div>
+    </div>
+    <div class="panel-b">
+      <div class="croquis-opts">
+        <div class="field inline">
+          <label for="crEscala">Un cuadro de la grilla mide</label>
+          <div class="unit" data-unit="mm"><input class="input" id="crEscala" inputmode="numeric" value="100"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="crSnap" checked><span>Ajustar a la grilla</span></label>
+        <span class="hint" id="crAyuda"></span>
+      </div>
+      <div class="croquis-lienzo" id="crLienzo"></div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ HISTORIAL ============ -->
+<main class="view" id="view-historial" hidden>
+  <div class="settings-intro">
+    <div>
+      <h1 class="h-big">Historial de cotizaciones</h1>
+      <p>Abre una cotización para editarla, duplícala para un cliente parecido o cambia su estado.</p>
+    </div>
+  </div>
+  <div class="list-tools">
+    <input class="input" id="histSearch" type="search" placeholder="Buscar por cliente, obra o número">
+    <select class="select" id="histFilter">
+      <option value="">Todos los estados</option>
+      <option value="borrador">Borrador</option>
+      <option value="enviada">Enviada</option>
+      <option value="aceptada">Aceptada</option>
+      <option value="rechazada">Rechazada</option>
+    </select>
+  </div>
+  <div class="hist" id="histList"></div>
+</main>
+
+<!-- ============ MATERIALES ============ -->
+<main class="view" id="view-materiales" hidden>
+  <div class="settings-intro">
+    <div>
+      <h1 class="h-big">Materiales y precios</h1>
+      <p>Valores netos en pesos, sin IVA. Los cambios se aplican a los muebles que agregues desde ahora; las cotizaciones ya guardadas conservan su precio.</p>
+    </div>
+    <div class="intro-actions">
+      <button class="btn btn-ghost" id="catReset">Restaurar valores de referencia</button>
+      <button class="btn btn-primary" id="catSave">Guardar cambios</button>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="panel-h"><h2 class="h-label">Tableros</h2><button class="btn btn-ghost btn-sm" id="addTablero">Agregar tablero</button></div>
+    <div class="panel-b">
+      <p class="hint">El precio es por plancha entera. El costo de cada pieza se prorratea por superficie. Marca <strong>macizo</strong> en los tableros cuyo canto queda a la vista: a esos no se les cuenta tapacanto.</p>
+      <div class="tbl-wrap"><table class="tbl" id="tblTableros"><thead><tr>
+        <th>Nombre</th><th>Espesor</th><th>Largo</th><th>Ancho</th><th>Precio plancha</th><th>$/m²</th><th>Macizo</th><th></th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h"><h2 class="h-label">Madera dimensionada</h2><button class="btn btn-ghost btn-sm" id="addEscuadria">Agregar escuadría</button></div>
+    <div class="panel-b">
+      <p class="hint">Seca y cepillada, con el espesor y el ancho en pulgadas. El precio es por metro lineal: en cada mueble anotas el largo y cuántas piezas van.</p>
+      <div class="tbl-wrap"><table class="tbl" id="tblEscuadrias"><thead><tr>
+        <th>Madera</th><th>Espesor</th><th>Ancho</th><th>Precio por metro</th><th></th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h"><h2 class="h-label">Perfiles de fierro</h2><button class="btn btn-ghost btn-sm" id="addPerfil">Agregar perfil</button></div>
+    <div class="panel-b">
+      <p class="hint">También por metro lineal.</p>
+      <div class="tbl-wrap"><table class="tbl" id="tblPerfiles"><thead><tr>
+        <th>Perfil</th><th>Precio por metro</th><th></th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h"><h2 class="h-label">Cantos</h2></div>
+    <div class="panel-b">
+      <p class="hint">Precio por metro lineal instalado. El canto fino va en los bordes internos; el grueso, en puertas y frentes.</p>
+      <div class="tbl-wrap"><table class="tbl" id="tblCantos"><thead><tr><th>Nombre</th><th>Precio por metro</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h"><h2 class="h-label">Herrajes</h2></div>
+    <div class="panel-b"><div class="tbl-wrap"><table class="tbl" id="tblHerrajes"><thead><tr><th>Herraje</th><th>Unidad</th><th>Precio</th></tr></thead><tbody></tbody></table></div></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h"><h2 class="h-label">Mano de obra</h2></div>
+    <div class="panel-b"><div class="tbl-wrap"><table class="tbl" id="tblMano"><thead><tr><th>Partida</th><th>Unidad</th><th>Precio</th></tr></thead><tbody></tbody></table></div></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h"><h2 class="h-label">Parámetros de cálculo</h2></div>
+    <div class="panel-b">
+      <div class="params-grid">
+        <div class="field"><label for="pDesperdicio">Desperdicio de tablero</label><div class="unit" data-unit="%"><input class="input" id="pDesperdicio" inputmode="decimal"></div></div>
+        <div class="field"><label for="pGastos">Gastos generales</label><div class="unit" data-unit="%"><input class="input" id="pGastos" inputmode="decimal"></div></div>
+        <div class="field"><label for="pMargen">Margen de utilidad</label><div class="unit" data-unit="%"><input class="input" id="pMargen" inputmode="decimal"></div></div>
+        <div class="field"><label for="pRedondeo">Redondear precio a</label><div class="unit" data-unit="$"><input class="input" id="pRedondeo" inputmode="numeric"></div></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ EMPRESA ============ -->
+<main class="view" id="view-empresa" hidden>
+  <div class="settings-intro">
+    <div>
+      <h1 class="h-big">Empresa y condiciones</h1>
+      <p>Estos datos aparecen en el encabezado y el pie de cada cotización y de los PDF.</p>
+    </div>
+  </div>
+  <form class="panel" id="empresaForm">
+    <div class="panel-b">
+      <div class="logo-row">
+        <div class="logo-prev" id="eLogoPrev" data-vacio="Sin logo"></div>
+        <div class="logo-acc">
+          <span class="h-label">Logo</span>
+          <p class="hint">Aparece arriba en la cotización y en los PDF. PNG, JPG, SVG o WebP; se reduce solo para que no ocupe espacio de más.</p>
+          <div class="logo-btns">
+            <label class="btn btn-sm" for="eLogoFile">Elegir imagen</label>
+            <input type="file" id="eLogoFile" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden>
+            <button type="button" class="btn btn-ghost btn-sm" id="eLogoDel" hidden>Quitar</button>
+          </div>
+        </div>
+      </div>
+      <div class="company-grid">
+        <div class="field"><label for="eNombre">Nombre de la mueblería</label><input class="input" id="eNombre" required></div>
+        <div class="field"><label for="eRut">RUT</label><input class="input" id="eRut"></div>
+        <div class="field"><label for="eTelefono">Teléfono / WhatsApp</label><input class="input" id="eTelefono" inputmode="tel"></div>
+        <div class="field"><label for="eEmail">Correo</label><input class="input" id="eEmail" type="email"></div>
+        <div class="field full"><label for="eDireccion">Dirección</label><input class="input" id="eDireccion"></div>
+        <div class="field"><label for="eIva">IVA</label><div class="unit" data-unit="%"><input class="input" id="eIva" inputmode="decimal"></div></div>
+        <div class="field"><label for="eValidez">Validez de la cotización</label><div class="unit" data-unit="días"><input class="input" id="eValidez" inputmode="numeric"></div></div>
+        <div class="field full"><label for="eCondiciones">Condiciones comerciales</label><textarea class="textarea" id="eCondiciones" rows="5"></textarea></div>
+      </div>
+    </div>
+    <div class="panel-foot"><button class="btn btn-primary" type="submit">Guardar datos</button></div>
+  </form>
+</main>
+
+<!-- ============ DIÁLOGOS ============ -->
+<dialog id="despieceDlg" aria-labelledby="despTitle">
+  <div class="dlg-b">
+    <h2 class="h-label" id="despTitle">Despiece y lista de compra</h2>
+    <div id="despieceBody"></div>
+  </div>
+  <div class="dlg-f">
+    <button class="btn btn-primary" id="despPdf">Descargar PDF</button>
+    <button class="btn" id="despClose">Cerrar</button>
+  </div>
+</dialog>
+
+<dialog id="shareDlg" aria-labelledby="shareTitle">
+  <div class="dlg-b">
+    <h2 class="h-label" id="shareTitle">Resumen para WhatsApp o correo</h2>
+    <p class="hint" id="shareHint">Selecciona el texto y cópialo.</p>
+    <textarea class="textarea" id="shareText" rows="12" readonly></textarea>
+  </div>
+  <div class="dlg-f"><button class="btn" id="shareClose">Cerrar</button></div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="data.js"></script>
+<script src="calc.js"></script>
+<script src="draw.js"></script>
+<script src="croquis.js"></script>
+<script src="logo.js"></script>
+<script src="store.js"></script>
+<script src="pdf.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
