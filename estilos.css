@@ -1,0 +1,162 @@
+/* Sitio del taller. Misma paleta que el cotizador, para que se vean
+   como dos partes de lo mismo. */
+
+:root {
+  --bg: #14110F;
+  --bg2: #1C1816;
+  --panel: #211C19;
+  --linea: #3A322D;
+  --texto: #F1ECE7;
+  --suave: #A79A90;
+  --tenue: #6E625B;
+  --acento: #C98A3E;
+  --acento-h: #DDA059;
+  --wa: #25D366;
+  --cond: "Barlow Condensed", system-ui, sans-serif;
+  --sans: "Source Sans 3", system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--texto);
+  font: 400 16px/1.6 var(--sans);
+  -webkit-text-size-adjust: 100%;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+
+.seccion-in { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+/* ---------- barra ---------- */
+.barra {
+  position: sticky; top: 0; z-index: 30;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--linea);
+}
+.barra-in {
+  max-width: 1120px; margin: 0 auto; padding: 12px 24px;
+  display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+}
+.marca { display: flex; align-items: baseline; gap: 9px; text-decoration: none; }
+.marca-n { font: 700 23px/1 var(--cond); letter-spacing: .5px; text-transform: uppercase; }
+.marca-o { font: 600 12px/1 var(--cond); letter-spacing: 1.5px; text-transform: uppercase; color: var(--acento); }
+.nav { display: flex; gap: 6px; flex-wrap: wrap; }
+.nav a {
+  text-decoration: none; color: var(--suave); font-size: 14.5px; font-weight: 600;
+  padding: 8px 13px; border-radius: 99px;
+}
+.nav a:hover { color: var(--texto); background: var(--panel); }
+
+/* ---------- botones ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 600 15.5px/1 var(--sans); text-decoration: none; cursor: pointer;
+  padding: 15px 24px; border-radius: 10px; border: 1px solid transparent;
+}
+.btn-wa { background: var(--wa); color: #06331A; }
+.btn-wa:hover { background: #3ee07a; }
+.btn-linea { border-color: var(--linea); color: var(--texto); }
+.btn-linea:hover { border-color: var(--acento); color: var(--acento); }
+
+/* ---------- portada ---------- */
+.hero {
+  position: relative; overflow: hidden;
+  padding: 92px 0 84px;
+  background:
+    radial-gradient(900px 420px at 15% -10%, color-mix(in srgb, var(--acento) 16%, transparent), transparent 70%),
+    var(--bg);
+  border-bottom: 1px solid var(--linea);
+}
+/* vetas de madera, muy tenues */
+.hero::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+  background: repeating-linear-gradient(94deg, transparent 0 38px, color-mix(in srgb, var(--acento) 5%, transparent) 38px 39px);
+}
+.hero-in { max-width: 1120px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero h1 {
+  font: 700 clamp(38px, 7vw, 66px)/1.03 var(--cond);
+  margin: 0 0 18px; max-width: 16ch; letter-spacing: .4px;
+}
+.bajada { font-size: 18px; color: var(--suave); max-width: 56ch; margin: 0 0 30px; }
+.hero-acc { display: flex; gap: 12px; flex-wrap: wrap; }
+.zona { margin: 22px 0 0; font-size: 14px; color: var(--tenue); }
+
+/* ---------- secciones ---------- */
+.seccion { padding: 76px 0; }
+.seccion.alt { background: var(--bg2); border-block: 1px solid var(--linea); }
+.titulo { font: 700 clamp(28px, 4vw, 38px)/1.1 var(--cond); margin: 0 0 10px; letter-spacing: .4px; }
+.intro { color: var(--suave); max-width: 58ch; margin: 0 0 30px; }
+#trabajos .titulo { margin-bottom: 30px; }
+
+/* ---------- galería ---------- */
+.galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.pieza {
+  margin: 0; background: var(--panel); border: 1px solid var(--linea);
+  border-radius: 12px; overflow: hidden;
+}
+.pieza:not(.sin-foto) { cursor: zoom-in; }
+.pieza img, .pieza .marco { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.pieza .marco {
+  background:
+    repeating-linear-gradient(107deg, #2A2320 0 15px, #302824 15px 31px),
+    var(--bg2);
+}
+.pieza figcaption { padding: 13px 15px 15px; display: grid; gap: 3px; }
+.pieza-t { font-weight: 600; font-size: 15.5px; }
+.pieza-d { font-size: 13.5px; color: var(--suave); }
+.pieza:not(.sin-foto):hover { border-color: var(--acento); }
+
+/* ---------- herramientas ---------- */
+.apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.app {
+  display: grid; gap: 7px; align-content: start; text-decoration: none;
+  background: var(--panel); border: 1px solid var(--linea); border-radius: 12px; padding: 20px;
+}
+.app:hover { border-color: var(--acento); }
+.app-n { font: 600 17px/1.2 var(--sans); }
+.app-t { font-size: 14.5px; color: var(--suave); }
+.app-ir { font-size: 13.5px; font-weight: 600; color: var(--acento); margin-top: 4px; }
+
+/* ---------- contacto ---------- */
+.contacto-in { text-align: center; }
+.contacto-in .intro { margin-inline: auto; }
+.contacto-acc { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* ---------- pie ---------- */
+.pie { border-top: 1px solid var(--linea); padding: 26px 0; }
+.pie-in { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; color: var(--tenue); font-size: 14px; }
+.pie a { color: var(--suave); text-decoration: none; }
+.pie a:hover { color: var(--acento); }
+
+/* ---------- botón flotante ---------- */
+.wa-flota {
+  position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 40;
+  width: 56px; height: 56px; border-radius: 50%; background: var(--wa);
+  display: grid; place-items: center; box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+}
+.wa-flota svg { width: 30px; height: 30px; fill: #06331A; }
+.wa-flota:hover { background: #3ee07a; }
+
+/* ---------- visor ---------- */
+#visor {
+  border: 0; background: none; padding: 0; max-width: min(1000px, 94vw); max-height: 92vh;
+  overflow: visible;
+}
+#visor::backdrop { background: rgba(8, 6, 5, .86); }
+#visorImg { border-radius: 12px; max-height: 88vh; width: auto; margin: 0 auto; }
+.visor-x {
+  position: absolute; top: -14px; right: -14px; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--texto); color: var(--bg); border: 0; cursor: pointer; font-size: 15px;
+}
+
+@media (max-width: 640px) {
+  .seccion { padding: 56px 0; }
+  .hero { padding: 64px 0 56px; }
+  .seccion-in, .hero-in, .barra-in { padding-inline: 18px; }
+  .hero-acc .btn, .contacto-acc .btn { width: 100%; }
+  .nav { width: 100%; order: 3; }
+}

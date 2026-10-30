@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Muebles a medida en madera y fierro: cocinas, closets, libreros y mesones.">
+<title>Taller de muebles</title>
+<meta name="theme-color" content="#14110F">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600&display=swap">
+<link rel="stylesheet" href="estilos.css">
+<style>[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<header class="barra">
+  <div class="barra-in">
+    <a class="marca" href="#inicio">
+      <span class="marca-n" id="marcaNombre"></span>
+      <span class="marca-o" id="marcaOficio"></span>
+    </a>
+    <nav class="nav">
+      <a href="#trabajos">Trabajos</a>
+      <a href="#herramientas">Herramientas</a>
+      <a href="#contacto">Contacto</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero" id="inicio">
+    <div class="hero-in">
+      <h1 id="titular"></h1>
+      <p class="bajada" id="bajada"></p>
+      <div class="hero-acc">
+        <a class="btn btn-wa" id="waHero" hidden>Escríbeme por WhatsApp</a>
+        <a class="btn btn-linea" href="https://muebles.cvargas.org">Cotiza tu mueble</a>
+      </div>
+      <p class="zona" id="zona" hidden></p>
+    </div>
+  </section>
+
+  <section class="seccion" id="trabajos">
+    <div class="seccion-in">
+      <h2 class="titulo">Trabajos</h2>
+      <div class="galeria" id="galeria"></div>
+    </div>
+  </section>
+
+  <section class="seccion alt" id="herramientas">
+    <div class="seccion-in">
+      <h2 class="titulo">Herramientas</h2>
+      <p class="intro">Aplicaciones que programé para el oficio. Son gratuitas y funcionan en el navegador.</p>
+      <div class="apps" id="apps"></div>
+    </div>
+  </section>
+
+  <section class="seccion" id="contacto">
+    <div class="seccion-in contacto-in">
+      <h2 class="titulo">Conversemos</h2>
+      <p class="intro" id="contactoTexto">Cuéntame qué mueble necesitas y las medidas del espacio.</p>
+      <div class="contacto-acc">
+        <a class="btn btn-wa" id="waContacto" hidden>Escríbeme por WhatsApp</a>
+        <a class="btn btn-linea" id="mailContacto" hidden></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="pie">
+  <div class="seccion-in pie-in">
+    <span id="pieNombre"></span>
+    <span class="pie-sep">·</span>
+    <a href="https://muebles.cvargas.org">Cotizador</a>
+  </div>
+</footer>
+
+<a class="wa-flota" id="waFlota" hidden aria-label="Escríbeme por WhatsApp">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.32 4.96L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm5.8 14.17c-.25.69-1.44 1.32-1.99 1.37-.53.05-1.02.24-3.44-.72-2.9-1.14-4.73-4.11-4.87-4.3-.14-.19-1.16-1.54-1.16-2.94 0-1.4.73-2.09.99-2.37.26-.29.57-.36.76-.36l.54.01c.17 0 .41-.07.64.49.25.6.83 2.07.9 2.22.07.15.12.32.02.51-.1.19-.15.31-.29.48l-.44.51c-.14.14-.29.3-.12.59.17.29.74 1.22 1.59 1.98 1.09.97 2.01 1.27 2.3 1.42.29.14.46.12.63-.07.17-.19.73-.85.92-1.14.19-.29.39-.24.65-.14.26.09 1.66.78 1.94.93.29.14.48.21.55.33.07.12.07.69-.18 1.38Z"/></svg>
+</a>
+
+<dialog id="visor" aria-label="Foto ampliada">
+  <img id="visorImg" alt="">
+  <button class="visor-x" id="visorCerrar" aria-label="Cerrar">✕</button>
+</dialog>
+
+<script src="datos.js"></script>
+<script src="sitio.js"></script>
+</body>
+</html>

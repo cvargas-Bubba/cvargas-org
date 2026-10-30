@@ -1,0 +1,2 @@
+Las fotos de los trabajos van en esta carpeta.
+Mira el README para saber como referenciarlas en datos.js.
