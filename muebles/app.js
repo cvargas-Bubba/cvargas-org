@@ -54,29 +54,43 @@
 
   function pintarBarraMaterial() {
     if (!croquis) return;
-    const o = croquis.seleccionado();
-    $("crMatBar").hidden = !o;
-    if (!o) return;
-    const lista = itemsLineales();
-    $("crMat").innerHTML = `<option value="">Sin material</option>` + lista.map((i) =>
-      `<option value="${esc(i.id)}"${i.id === o.mat ? " selected" : ""}>${esc(MQ.nombreItem(i))}</option>`).join("");
-    $("crPiezas").value = MQ.croquis.piezasDe(o);
+    const os = croquis.seleccionados();
+    $("crMatBar").hidden = !os.length;
+    if (!os.length) return;
+    const o = os[0];
+    const varias = os.length > 1;
+    /* con varias elegidas el material y las piezas solo se muestran si
+       coinciden; si no, los campos parten en blanco y lo que se elija vale
+       para todas */
+    const mixto = !os.every((x) => (x.mat || "") === (o.mat || ""));
+    const mismoMat = mixto ? "" : (o.mat || "");
+    const mismasPz = os.every((x) => MQ.croquis.piezasDe(x) === MQ.croquis.piezasDe(o));
 
-    const p = partida();
-    const mm = MQ.croquis.mmPorUnidad(p.croquis);
-    const largo = Math.round(MQ.croquis.largoMm(o, mm));
-    const it = o.mat && MQ.calc.item(S.catalogo, o.mat);
-    const pz = MQ.croquis.piezasDe(o);
-    /* en una figura cerrada el largo es la suma de los lados: conviene decirlo,
-       porque el número no coincide con ninguna de las medidas que se ven */
-    const q = (MQ.croquis.cerrada(o) ? "contorno " : "") + largo + " mm";
-    $("crMatCalc").textContent = it
-      ? q + " × " + pz + " = " + MQ.dec(largo / 1000 * pz, 2) + " m · " + MQ.clp(largo / 1000 * pz * it.precio)
-      : q;
+    $("crMatTitulo").textContent = varias ? "Material de las " + os.length + " figuras" : "Material de la figura";
+    const lista = itemsLineales();
+    $("crMat").innerHTML = (mixto ? `<option value="=" selected>Varios materiales</option>` : "") +
+      `<option value=""${!mixto && !mismoMat ? " selected" : ""}>Sin material</option>` +
+      lista.map((i) => `<option value="${esc(i.id)}"${i.id === mismoMat ? " selected" : ""}>${esc(MQ.nombreItem(i))}</option>`).join("");
+    $("crPiezas").value = mismasPz ? MQ.croquis.piezasDe(o) : "";
+
+    const mm = MQ.croquis.mmPorUnidad(partida().croquis);
+    const it = mismoMat && MQ.calc.item(S.catalogo, mismoMat);
+    const metros = os.reduce((s, x) => s + MQ.croquis.largoMm(x, mm) / 1000 * MQ.croquis.piezasDe(x), 0);
+    let q;
+    if (varias) {
+      q = os.length + " figuras · " + MQ.dec(metros, 2) + " m";
+    } else {
+      /* en una figura cerrada el largo es la suma de los lados: conviene decirlo,
+         porque el número no coincide con ninguna de las medidas que se ven */
+      const largo = Math.round(MQ.croquis.largoMm(o, mm));
+      q = (MQ.croquis.cerrada(o) ? "contorno " : "") + largo + " mm × " + MQ.croquis.piezasDe(o)
+        + " = " + MQ.dec(metros, 2) + " m";
+    }
+    $("crMatCalc").textContent = it ? q + " · " + MQ.clp(metros * it.precio) : q;
   }
 
   const AYUDA = {
-    sel: "Haz clic en un trazo para seleccionarlo y arrástralo. Doble clic sobre una figura te deja escribirle la medida exacta, y sobre una cota o un rótulo, su texto. Con uno seleccionado puedes asignarle material.",
+    sel: "Haz clic en un trazo para seleccionarlo y arrástralo. Para varios a la vez, arrastra un recuadro sobre ellos o súmalos con Ctrl o Shift: el material se asigna a todos juntos. Doble clic te deja escribir la medida exacta, o el texto de una cota o un rótulo.",
     lapiz: "Dibuja arrastrando, como con un lápiz. No se ajusta a la grilla.",
     linea: "Arrastra para dibujar la línea.",
     rect: "Arrastra para dibujar el rectángulo.",
@@ -549,7 +563,10 @@
       if (MQ.croquis.vistaVacia(vista())) return MQ.toast("Esta vista ya está vacía.");
       if (confirm("¿Borrar todo lo dibujado en esta vista?")) croquis.limpiar();
     });
-    $("crMat").addEventListener("change", () => { croquis.asignar($("crMat").value, undefined); pintarBarraMaterial(); });
+    $("crMat").addEventListener("change", () => {
+      if ($("crMat").value === "=") return;   // "varios materiales": no toca nada
+      croquis.asignar($("crMat").value, undefined); pintarBarraMaterial();
+    });
     $("crPiezas").addEventListener("input", () => { croquis.asignar(undefined, $("crPiezas").value); pintarBarraMaterial(); });
 
     document.addEventListener("keydown", (ev) => {

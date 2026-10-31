@@ -271,8 +271,10 @@ MQ.croquis = (function () {
       const b = caja(o), m = 8;
       formas.push({ t: "rect", x: b.x1 - m, y: b.y1 - m, w: b.x2 - b.x1 + m * 2, h: b.y2 - b.y1 + m * 2, clase });
     };
-    if (op.hover && op.hover !== op.sel) marco(op.hover, "hover");
-    marco(op.sel, "sel");
+    /* `sel` puede traer varias figuras: cada una lleva su marco */
+    const sels = op.sel == null ? [] : [].concat(op.sel);
+    if (op.hover && sels.indexOf(op.hover) < 0) marco(op.hover, "hover");
+    sels.forEach((id) => marco(id, "sel"));
 
     return { w: an, h: H, formas };
   }
@@ -287,9 +289,11 @@ MQ.croquis = (function () {
   function montar(cont, leer, alCambiar, nombreMat) {
     let herramienta = "sel";
     let libre = false;      // sin ajuste a la grilla
-    let sel = null, hover = null;
+    let sel = [];           // puede haber varias figuras seleccionadas
+    let hover = null;
     let trazando = null;    // mientras se arrastra una figura
-    let arrastre = null;    // mientras se mueve un objeto
+    let arrastre = null;    // mientras se mueve la selección
+    let banda = null;       // recuadro de selección por arrastre
     let cadena = null;      // puntos de la polilínea en curso
     let mano = null;        // puntos del trazo a mano alzada en curso
     let cursor = null;
@@ -297,6 +301,7 @@ MQ.croquis = (function () {
     const historia = [];
 
     const objetos = () => leer().vista.objetos;
+    const elegidos = () => objetos().filter((o) => sel.indexOf(o.id) >= 0);
     const esDibujo = () => herramienta !== "sel";
     const guardar = () => {
       historia.push(JSON.stringify(objetos()));
@@ -326,6 +331,13 @@ MQ.croquis = (function () {
           const l = Math.hypot(t.x2 - t.x1, t.y2 - t.y1);
           medida((t.x1 + t.x2) / 2, (t.y1 + t.y2) / 2 - 9, Math.round(l * mm) + " mm");
         }
+      }
+      if (banda) {
+        f.push({
+          t: "rect", clase: "banda",
+          x: Math.min(banda.x1, banda.x2), y: Math.min(banda.y1, banda.y2),
+          w: Math.abs(banda.x2 - banda.x1), h: Math.abs(banda.y2 - banda.y1)
+        });
       }
       if (mano && mano.length > 1) f.push({ t: "poli", pts: mano, cerrado: false, clase: "lapiz" });
       if (cadena && cadena.length) {
@@ -428,22 +440,40 @@ MQ.croquis = (function () {
     /* La cota es una anotación: se le escribe el texto. Cualquier otra figura
        es el mueble mismo, así que lo que se escribe es su medida y la figura
        se estira hasta ahí. */
-    function editar(o) {
+    function editar(objs) {
+      const lista = [].concat(objs);
+      const o = lista[0];
+      if (!o) return;
       const c = leer();
       const mm = mmPorUnidad(c.croquis);
+      if (lista.length > 1) {
+        /* con varias elegidas no se edita texto: se les da la misma medida */
+        const figs = lista.filter((x) => x.t !== "texto" && x.t !== "cota");
+        if (!figs.length) return;
+        const caja = figs[0].t === "rect" || figs[0].t === "rombo";
+        const v = prompt("Medida en mm para las " + figs.length + " figuras"
+          + (caja ? ", ancho × alto:" : ":"), medidaDe(figs[0], mm));
+        if (v === null) return;
+        const nums = numerosDe(v);
+        if (!nums.length) return;
+        guardar();
+        figs.forEach((x) => aplicarMedida(x, nums, mm));
+        pintar(); alCambiar();
+        return;
+      }
       if (o.t === "cota") {
         const actual = (o.etiqueta || "").trim() || String(Math.round(largo(o) * mm));
         const v = prompt("Medida de la cota.\nDéjalo vacío para que vuelva a calcularse sola.", actual);
         if (v === null) return;
         guardar(); o.etiqueta = v.trim();
-        sel = null;
+        sel = [];
       } else if (o.t === "texto") {
         const v = prompt("Texto del rótulo:", o.s);
         if (v === null) return;
         guardar();
         if (!v.trim()) c.vista.objetos = c.vista.objetos.filter((x) => x.id !== o.id);
         else o.s = v.trim();
-        sel = null;
+        sel = [];
       } else {
         const caja = o.t === "rect" || o.t === "rombo";
         const v = prompt(caja ? "Medida en mm, ancho × alto:" : "Largo en mm:", medidaDe(o, mm));
@@ -479,9 +509,23 @@ MQ.croquis = (function () {
 
       if (herramienta === "sel") {
         const o = objetoEn(objetos(), p.x, p.y);
-        if (doble && o) { editar(o); return; }
-        sel = o ? o.id : null;
-        if (o) { guardar(); arrastre = { id: o.id, x: p.x, y: p.y }; }
+        if (doble && o) { editar(sel.length > 1 && sel.indexOf(o.id) >= 0 ? elegidos() : o); return; }
+        const sumar = ev.shiftKey || ev.ctrlKey || ev.metaKey;
+        if (o) {
+          if (sumar) {
+            const i = sel.indexOf(o.id);
+            if (i >= 0) sel.splice(i, 1); else sel.push(o.id);
+          } else if (sel.indexOf(o.id) < 0) {
+            sel = [o.id];
+          }
+          /* se arrastra todo lo elegido: así un marco entero se mueve junto */
+          if (sel.indexOf(o.id) >= 0) { guardar(); arrastre = { x: p.x, y: p.y }; }
+        } else if (sumar) {
+          /* con la tecla puesta, el clic al aire no deshace lo elegido */
+        } else {
+          sel = [];
+          banda = { x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+        }
         pintar(); alCambiar();
         return;
       }
@@ -512,8 +556,15 @@ MQ.croquis = (function () {
     cont.addEventListener("pointermove", (ev) => {
       if (arrastre) {
         const p = punto(ev);
-        const o = objetos().find((x) => x.id === arrastre.id);
-        if (o) { mover(o, p.x - arrastre.x, p.y - arrastre.y); arrastre.x = p.x; arrastre.y = p.y; }
+        const dx = p.x - arrastre.x, dy = p.y - arrastre.y;
+        if (dx || dy) elegidos().forEach((o) => mover(o, dx, dy));
+        arrastre.x = p.x; arrastre.y = p.y;
+        pintar();
+        return;
+      }
+      if (banda) {
+        const p = punto(ev, true);
+        banda.x2 = p.x; banda.y2 = p.y;
         pintar();
         return;
       }
@@ -542,11 +593,28 @@ MQ.croquis = (function () {
       if (herramienta !== "sel") return;
       const p = punto(ev);
       const o = objetoEn(objetos(), p.x, p.y);
-      if (o) { ultimoDoble = Date.now(); editar(o); }
+      if (o) { ultimoDoble = Date.now(); editar(sel.length > 1 && sel.indexOf(o.id) >= 0 ? elegidos() : o); }
     });
 
     function soltar() {
       if (arrastre) { arrastre = null; pintar(); alCambiar(); return; }
+      if (banda) {
+        const b = banda; banda = null;
+        const r = {
+          x1: Math.min(b.x1, b.x2), y1: Math.min(b.y1, b.y2),
+          x2: Math.max(b.x1, b.x2), y2: Math.max(b.y1, b.y2)
+        };
+        /* basta con tocar el recuadro: encerrar entero un marco grande
+           obligaría a barrer toda la pantalla */
+        if (r.x2 - r.x1 > MIN || r.y2 - r.y1 > MIN) {
+          sel = objetos().filter((o) => {
+            const c = caja(o);
+            return c.x1 <= r.x2 && c.x2 >= r.x1 && c.y1 <= r.y2 && c.y2 >= r.y1;
+          }).map((o) => o.id);
+        }
+        pintar(); alCambiar();
+        return;
+      }
       if (mano) {
         const pts = mano; mano = null;
         if (pts.length > 2) { guardar(); objetos().push({ id: MQ.uid(), t: "lapiz", pts }); alCambiar(); }
@@ -581,55 +649,56 @@ MQ.croquis = (function () {
       pintar,
       /* al cambiar de vista o de partida se limpia lo que estaba en curso */
       reiniciar() {
-        cadena = null; mano = null; trazando = null; sel = null; hover = null; historia.length = 0;
+        cadena = null; mano = null; trazando = null; sel = []; hover = null; historia.length = 0;
         if (vp) encuadrar();
         pintar();
       },
       /* a pantalla completa la ventana se pone sobre el dibujo, para que el
          mueble se vea grande; al salir se vuelve a ver el lienzo entero */
       encuadre(on) { if (on) encuadrar(); else vp = null; pintar(); },
-      /* ---- material de la figura seleccionada ---- */
-      seleccionado() {
-        const o = sel && objetos().find((x) => x.id === sel);
-        return o && o.t !== "texto" ? o : null;
-      },
+      /* ---- material de lo seleccionado ----
+         Los rótulos quedan fuera: no son material de nada. */
+      seleccionados() { return elegidos().filter((o) => o.t !== "texto"); },
+      seleccionado() { return this.seleccionados()[0] || null; },
       asignar(mat, piezas) {
-        const o = this.seleccionado();
-        if (!o) return false;
+        const os = this.seleccionados();
+        if (!os.length) return false;
         guardar();
-        if (mat !== undefined) { if (mat) o.mat = mat; else delete o.mat; }
-        if (piezas !== undefined) o.piezas = Math.max(1, Math.round(MQ.num(piezas, 1)));
+        os.forEach((o) => {
+          if (mat !== undefined) { if (mat) o.mat = mat; else delete o.mat; }
+          if (piezas !== undefined) o.piezas = Math.max(1, Math.round(MQ.num(piezas, 1)));
+        });
         pintar(); alCambiar();
         return true;
       },
-      herramienta(h) { if (cadena) terminarCadena(); herramienta = h; sel = null; hover = null; pintar(); },
+      herramienta(h) { if (cadena) terminarCadena(); herramienta = h; sel = []; hover = null; pintar(); },
       ajuste(v) { libre = !v; },
       enCadena: () => !!cadena,
       cerrarCadena() { if (cadena) terminarCadena(); },
       editarSeleccion() {
-        const o = sel && objetos().find((x) => x.id === sel);
-        if (!o) return false;
-        editar(o);
+        const os = elegidos();
+        if (!os.length) return false;
+        editar(os.length > 1 ? os : os[0]);
         return true;
       },
       borrar() {
-        if (!sel) return false;
+        if (!sel.length) return false;
         guardar();
         const c = leer();
-        c.vista.objetos = c.vista.objetos.filter((o) => o.id !== sel);
-        sel = null; hover = null; pintar(); alCambiar();
+        c.vista.objetos = c.vista.objetos.filter((o) => sel.indexOf(o.id) < 0);
+        sel = []; hover = null; pintar(); alCambiar();
         return true;
       },
       deshacer() {
         if (!historia.length) return false;
         leer().vista.objetos = JSON.parse(historia.pop());
-        sel = null; hover = null; cadena = null; pintar(); alCambiar();
+        sel = []; hover = null; cadena = null; pintar(); alCambiar();
         return true;
       },
       limpiar() {
         guardar();
         leer().vista.objetos = [];
-        sel = null; hover = null; cadena = null; pintar(); alCambiar();
+        sel = []; hover = null; cadena = null; pintar(); alCambiar();
       }
     };
   }
