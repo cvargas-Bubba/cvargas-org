@@ -178,16 +178,24 @@
         </div>
       </article>
 
-      <div class="status-row">
-        <div class="field inline">
-          <label for="qEstado">Estado</label>
-          <select class="select pill-select" id="qEstado">
-            <option value="borrador">Borrador</option>
-            <option value="enviada">Enviada</option>
-            <option value="aceptada">Aceptada</option>
-            <option value="rechazada">Rechazada</option>
-          </select>
+      <section class="panel seguimiento">
+        <div class="panel-h">
+          <h2 class="h-label">Seguimiento del trabajo</h2>
+          <button class="btn btn-ghost btn-sm" id="segRechazo">Marcar rechazada</button>
         </div>
+        <div class="panel-b">
+          <ol class="etapas" id="etapas"></ol>
+          <div class="lin-h mt">
+            <span class="h-label">Abonos</span>
+            <button class="btn btn-ghost btn-sm" id="addPago">Agregar abono</button>
+          </div>
+          <div id="listaPagos"></div>
+          <div class="pago-tot" id="pagoTotales"></div>
+        </div>
+      </section>
+
+      <div class="status-row">
+        <span class="hint" id="segResumen"></span>
         <button class="btn btn-ghost btn-sm" id="btnNew">Nueva cotización</button>
       </div>
 
@@ -256,11 +264,14 @@
   <div class="list-tools">
     <input class="input" id="histSearch" type="search" placeholder="Buscar por cliente, obra o número">
     <select class="select" id="histFilter">
-      <option value="">Todos los estados</option>
+      <option value="">Todas las etapas</option>
       <option value="borrador">Borrador</option>
       <option value="enviada">Enviada</option>
       <option value="aceptada">Aceptada</option>
+      <option value="taller">En taller</option>
+      <option value="entregada">Entregada</option>
       <option value="rechazada">Rechazada</option>
+      <option value="saldo">— Con saldo pendiente</option>
     </select>
   </div>
   <div class="hist" id="histList"></div>

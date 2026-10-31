@@ -89,6 +89,12 @@ MQ.store = (function () {
     convertirCotizacion(q);
     if (!Array.isArray(q.partidas)) q.partidas = [];
     if (!q.cliente) q.cliente = {};
+    /* seguimiento: las cotizaciones viejas no traen fechas ni abonos. La
+       etapa que ya tenían sigue valiendo, pero sin fecha: no se la vamos a
+       inventar. */
+    if (!q.hitos || typeof q.hitos !== "object") q.hitos = {};
+    if (!Array.isArray(q.pagos)) q.pagos = [];
+    if (!q.estado) q.estado = "borrador";
     q.partidas.forEach((p) => {
       if (!Array.isArray(p.lineas)) p.lineas = [];
       if (!p.croquis || !Array.isArray(p.croquis.vistas)) p.croquis = MQ.nuevoCroquis();

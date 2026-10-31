@@ -120,6 +120,37 @@ MQ.nombreCorto = function (it) {
   return n.length > 20 ? n.slice(0, 19) + "…" : n;
 };
 
+/* ---------- etapas del trabajo ----------
+   El camino que recorre un trabajo, de la cotización a la entrega. Cada
+   etapa guarda su fecha en `hitos`, así el historial dice no solo en qué
+   quedó cada trabajo sino cuándo pasó cada cosa. "Rechazada" no es parte
+   del camino: es salirse de él, y por eso va aparte. */
+MQ.ETAPAS = [
+  { id: "borrador", nombre: "Borrador", corto: "Borrador", pie: "La estás armando" },
+  { id: "enviada", nombre: "Enviada al cliente", corto: "Enviada", pie: "El cliente ya la tiene" },
+  { id: "aceptada", nombre: "Aceptada", corto: "Aceptada", pie: "El cliente la aprobó" },
+  { id: "taller", nombre: "En taller", corto: "En taller", pie: "Abonada y en fabricación" },
+  { id: "entregada", nombre: "Entregada", corto: "Entregada", pie: "Trabajo entregado" }
+];
+MQ.RECHAZADA = { id: "rechazada", nombre: "Rechazada", corto: "Rechazada", pie: "El cliente no siguió" };
+MQ.etapa = (id) => MQ.ETAPAS.find((e) => e.id === id) || (id === "rechazada" ? MQ.RECHAZADA : MQ.ETAPAS[0]);
+MQ.etapaIndice = (id) => MQ.ETAPAS.findIndex((e) => e.id === id);
+
+/* fecha de hoy como YYYY-MM-DD, en hora local: estas fechas son del taller,
+   no instantes, y en UTC el trabajo entregado de tarde cambia de día */
+MQ.hoy = function () {
+  const d = new Date();
+  const dd = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + dd(d.getMonth() + 1) + "-" + dd(d.getDate());
+};
+MQ.fechaDia = (f) => {
+  if (!f) return "";
+  const p = String(f).slice(0, 10).split("-");
+  return p.length === 3 ? p[2] + "-" + p[1] + "-" + p[0] : String(f);
+};
+
+MQ.nuevoPago = () => ({ id: MQ.uid(), fecha: MQ.hoy(), monto: 0, medio: "" });
+
 MQ.nuevaVista = (nombre) => ({ id: MQ.uid(), nombre: nombre || "Frente", objetos: [] });
 MQ.nuevoCroquis = () => ({ escala: 100, acotar: true, vistas: [MQ.nuevaVista("Frente")] });
 

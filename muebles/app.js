@@ -17,14 +17,14 @@
     MQ.toast._t = setTimeout(() => { t.hidden = true; }, 3200);
   };
 
-  const ESTADOS = { borrador: "Borrador", enviada: "Enviada", aceptada: "Aceptada", rechazada: "Rechazada" };
   const fechaCorta = (iso) => new Date(iso || Date.now()).toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
 
   function nuevaCotizacion() {
     return {
       id: MQ.uid(), numero: 0, estado: "borrador", creado: new Date().toISOString(),
       cliente: { nombre: "", rut: "", telefono: "", email: "", obra: "" },
-      partidas: [], descuento: 0, notas: ""
+      partidas: [], descuento: 0, notas: "",
+      hitos: {}, pagos: []
     };
   }
 
@@ -259,6 +259,8 @@
       fila("IVA " + T.ivaPct + "%", MQ.clp(T.iva)) +
       fila("Total", MQ.clp(T.total), "grand");
 
+    /* el saldo cuelga del total: si cambia el precio, cambia lo que falta */
+    pintarPlata();
     guardarBorrador();
   }
 
@@ -270,7 +272,6 @@
     };
     quote.descuento = Math.min(90, Math.max(0, MQ.num($("qDescuento").value, 0)));
     quote.notas = $("qNotas").value;
-    quote.estado = $("qEstado").value;
   }
 
   function volcarHoja() {
@@ -280,8 +281,95 @@
     $("cObra").value = c.obra || "";
     $("qDescuento").value = quote.descuento || 0;
     $("qNotas").value = quote.notas || "";
-    $("qEstado").value = quote.estado || "borrador";
+    pintarSeguimiento();
   }
+
+  /* ================= SEGUIMIENTO DEL TRABAJO =================
+     De la cotización a la entrega: cada etapa guarda su fecha y los abonos
+     dicen cuánto falta por cobrar. Marcar una etapa guarda la cotización en
+     el historial, porque desde que el cliente la aceptó esto ya no es un
+     borrador sino un trabajo que hay que poder encontrar después. */
+  function pintarSeguimiento() {
+    const est = quote.estado || "borrador";
+    const idx = MQ.etapaIndice(est);
+    const rech = est === "rechazada";
+    const hitos = quote.hitos || (quote.hitos = {});
+
+    $("etapas").innerHTML = MQ.ETAPAS.map((e, i) => {
+      /* una etapa con fecha sigue estando hecha aunque el trabajo se haya
+         rechazado después: pasó, y el historial tiene que decirlo */
+      const hecha = (!rech && idx >= i) || !!hitos[e.id];
+      const actual = !rech && idx === i;
+      const f = hitos[e.id] || "";
+      return `<li class="etapa${hecha ? " hecha" : ""}${actual ? " actual" : ""}">
+        <button type="button" class="etapa-b" data-etapa="${esc(e.id)}" title="${esc(e.pie)}">
+          <span class="etapa-n">${i + 1}</span>
+          <span class="etapa-t">${esc(e.corto)}</span>
+        </button>
+        ${hecha && e.id !== "borrador"
+          ? `<input class="input etapa-f" type="date" value="${esc(f)}" data-fecha="${esc(e.id)}" aria-label="Fecha de ${esc(e.corto)}">`
+          : `<span class="etapa-f vacia">${esc(e.pie)}</span>`}
+      </li>`;
+    }).join("");
+
+    $("segRechazo").textContent = rech ? "Retomar el trabajo" : "Marcar rechazada";
+
+    /* ---- abonos ---- */
+    $("listaPagos").innerHTML = (quote.pagos || []).map((p, i) => `
+      <div class="pago">
+        <input class="input" type="date" value="${esc(p.fecha || "")}" data-pago="fecha" data-i="${i}" aria-label="Fecha del abono">
+        <div class="unit" data-unit="$"><input class="input" inputmode="numeric" value="${esc(p.monto || 0)}" data-pago="monto" data-i="${i}" aria-label="Monto"></div>
+        <input class="input" value="${esc(p.medio || "")}" placeholder="Transferencia, efectivo…" data-pago="medio" data-i="${i}" aria-label="Medio de pago">
+        <button class="icon" data-del-pago="${i}" title="Quitar" aria-label="Quitar abono">✕</button>
+      </div>`).join("") || `<p class="hint lin-vacio">Sin abonos todavía.</p>`;
+
+    pintarPlata();
+  }
+
+  /* Solo los números: se llama en cada tecla y no puede rehacer los campos,
+     que es como se pierde el cursor mientras uno escribe. */
+  function pintarPlata() {
+    const pg = MQ.calc.pagos(quote, S.catalogo, S.empresa);
+    $("pagoTotales").innerHTML =
+      `<div><span>Abonado</span><b class="mono">${MQ.clp(pg.pagado)}</b></div>` +
+      `<div class="${pg.saldo > 0 ? "debe" : "pagado"}"><span>${pg.saldo > 0 ? "Saldo por cobrar" : "Pagado al día"}</span><b class="mono">${MQ.clp(pg.saldo)}</b></div>`;
+    const e = MQ.etapa(quote.estado || "borrador");
+    const f = (quote.hitos || {})[quote.estado];
+    $("segResumen").textContent = e.nombre + (f ? " · " + MQ.fechaDia(f) : "");
+  }
+
+  /* Marcar una etapa deja fecha en ella y en las anteriores que no la tengan:
+     si uno registra la entrega de un trabajo que nunca marcó como aceptado,
+     el camino igual queda completo. */
+  function marcarEtapa(id) {
+    const i = MQ.etapaIndice(id);
+    if (i < 0) return;
+    const hoy = MQ.hoy();
+    /* volver atrás borra lo que no había pasado todavía, para que la etapa y
+       las fechas cuenten lo mismo; se avisa, porque son datos escritos */
+    const post = MQ.ETAPAS.slice(i + 1).filter((e) => quote.hitos[e.id]);
+    if (post.length) {
+      if (!confirm("Volver a «" + MQ.etapa(id).nombre + "» borra la fecha de " +
+        post.map((e) => e.corto.toLowerCase()).join(" y ") + ". ¿Seguir?")) return;
+      post.forEach((e) => { delete quote.hitos[e.id]; });
+    }
+    quote.estado = id;
+    if (id !== "borrador") quote.hitos[id] = quote.hitos[id] || hoy;
+    MQ.ETAPAS.slice(1, i).forEach((e) => { quote.hitos[e.id] = quote.hitos[e.id] || hoy; });
+    delete quote.hitos.rechazada;
+    guardarTrabajo(id !== "borrador");
+  }
+
+  /* Desde que deja de ser borrador, el trabajo vive en el historial: cada
+     cambio de etapa o de abono se guarda ahí, no solo en el borrador. */
+  function persistir(aHistorial) {
+    if (aHistorial || quote.numero) {
+      const g = S.saveQuote(quote);
+      quote.numero = g.numero; quote.actualizado = g.actualizado;
+    }
+    guardarBorrador();
+  }
+  function guardarTrabajo(aHistorial) { persistir(aHistorial); pintarSeguimiento(); }
 
   /* ================= RESUMEN DE TEXTO ================= */
   function resumenTexto() {
@@ -324,23 +412,36 @@
     const q = ($("histSearch").value || "").toLowerCase().trim();
     const f = $("histFilter").value;
     const lista = S.quotes.filter((x) => {
-      if (f && x.estado !== f) return false;
+      if (f === "saldo") {
+        /* lo que importa cobrar: trabajos en marcha o entregados que deben */
+        const pg = MQ.calc.pagos(x, S.catalogo, S.empresa);
+        if (pg.saldo <= 0 || ["borrador", "rechazada"].indexOf(x.estado) >= 0) return false;
+      } else if (f && x.estado !== f) return false;
       if (!q) return true;
       const c = x.cliente || {};
       return [c.nombre, c.obra, c.rut, String(x.numero)].filter(Boolean).some((s) => String(s).toLowerCase().includes(q));
     });
     $("histList").innerHTML = lista.length ? lista.map((x) => {
-      const T = MQ.calc.totales(x, S.catalogo, S.empresa);
+      const pg = MQ.calc.pagos(x, S.catalogo, S.empresa);
       const c = x.cliente || {};
       const n = (x.partidas || []).length;
+      const h = x.hitos || {};
+      const est = x.estado || "borrador";
+      /* la línea de abajo cuenta la historia del trabajo, no solo su fecha */
+      const paso = MQ.ETAPAS.filter((e) => h[e.id]).map((e) => e.corto + " " + MQ.fechaDia(h[e.id]));
+      if (h.rechazada) paso.push("Rechazada " + MQ.fechaDia(h.rechazada));
+      const saldo = pg.saldo > 0 && est !== "borrador" && est !== "rechazada";
       return `<article class="hcard">
         <div class="hc-no mono">N° ${x.numero || "—"}</div>
         <div class="hc-m">
           <div class="hc-t">${esc(c.nombre || "Sin cliente")}</div>
           <div class="hc-d">${esc([c.obra, n + (n === 1 ? " partida" : " partidas"), fechaCorta(x.actualizado || x.creado)].filter(Boolean).join(" · "))}</div>
+          ${paso.length ? `<div class="hc-paso mono">${esc(paso.join("  ›  "))}</div>` : ""}
         </div>
-        <div class="hc-p mono">${MQ.clp(T.total)}</div>
-        <span class="pill" data-estado="${esc(x.estado || "borrador")}">${esc(ESTADOS[x.estado] || "Borrador")}</span>
+        <div class="hc-p mono">${MQ.clp(pg.total)}
+          ${saldo ? `<span class="hc-saldo">debe ${MQ.clp(pg.saldo)}</span>` : (pg.pagado > 0 ? `<span class="hc-saldo ok">pagado</span>` : "")}
+        </div>
+        <span class="pill" data-estado="${esc(est)}">${esc(MQ.etapa(est).corto)}</span>
         <div class="hc-a">
           <button class="btn btn-sm" data-h="open" data-id="${esc(x.id)}">Abrir</button>
           <button class="btn btn-ghost btn-sm" data-h="dup" data-id="${esc(x.id)}">Duplicar</button>
@@ -606,9 +707,63 @@
       f.hidden = !f.hidden;
       $("clientEdit").setAttribute("aria-expanded", String(!f.hidden));
     });
-    ["cNombre", "cRut", "cTelefono", "cEmail", "cObra", "qDescuento", "qNotas", "qEstado"].forEach((id) => {
+    ["cNombre", "cRut", "cTelefono", "cEmail", "cObra", "qDescuento", "qNotas"].forEach((id) => {
       $(id).addEventListener("input", () => { leerHoja(); pintarHoja(); });
       $(id).addEventListener("change", () => { leerHoja(); pintarHoja(); });
+    });
+
+    /* ---- seguimiento ---- */
+    $("etapas").addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-etapa]");
+      if (!b) return;
+      leerHoja();
+      marcarEtapa(b.dataset.etapa);
+      MQ.toast(MQ.etapa(b.dataset.etapa).nombre + (quote.numero ? " · N° " + quote.numero : ""));
+    });
+    $("etapas").addEventListener("change", (ev) => {
+      const i = ev.target.dataset.fecha;
+      if (!i) return;
+      quote.hitos[i] = ev.target.value;
+      guardarTrabajo(false);
+    });
+    $("segRechazo").addEventListener("click", () => {
+      leerHoja();
+      if (quote.estado === "rechazada") {
+        /* se vuelve a la última etapa con fecha: donde quedó el trabajo */
+        const con = MQ.ETAPAS.filter((e) => quote.hitos[e.id]);
+        quote.estado = con.length ? con[con.length - 1].id : "borrador";
+        delete quote.hitos.rechazada;
+      } else {
+        quote.estado = "rechazada";
+        quote.hitos.rechazada = quote.hitos.rechazada || MQ.hoy();
+      }
+      guardarTrabajo(true);
+    });
+
+    $("addPago").addEventListener("click", () => {
+      leerHoja();
+      const pg = MQ.calc.pagos(quote, S.catalogo, S.empresa);
+      const p = MQ.nuevoPago();
+      /* el primer abono suele ser el saldo entero o la mitad: se propone el
+         saldo, que es el número que uno tiene a mano al cobrar */
+      p.monto = Math.round(pg.saldo);
+      quote.pagos.push(p);
+      guardarTrabajo(false);
+    });
+    $("listaPagos").addEventListener("input", (ev) => {
+      const c = ev.target.dataset.pago;
+      if (!c) return;
+      const p = quote.pagos[+ev.target.dataset.i];
+      if (!p) return;
+      p[c] = c === "monto" ? Math.max(0, MQ.num(ev.target.value, 0)) : ev.target.value;
+      /* solo los números: rehacer los campos acá dejaría el cursor afuera */
+      pintarPlata(); persistir(false);
+    });
+    $("listaPagos").addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-del-pago]");
+      if (!b) return;
+      quote.pagos.splice(+b.dataset.delPago, 1);
+      guardarTrabajo(false);
     });
 
     $("btnSave").addEventListener("click", () => {
@@ -729,6 +884,8 @@
       } else if (b.dataset.h === "dup") {
         quote = MQ.clone(x);
         quote.id = MQ.uid(); quote.numero = 0; quote.estado = "borrador";
+        /* la copia parte de cero: el seguimiento es del trabajo original */
+        quote.hitos = {}; quote.pagos = [];
         quote.creado = new Date().toISOString();
         delete quote.actualizado;
         quote.partidas.forEach((p) => { p.id = MQ.uid(); });

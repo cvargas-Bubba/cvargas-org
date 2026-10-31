@@ -114,6 +114,16 @@ MQ.calc = (function () {
     return { partidas, neto, descPct, descuento, afecto, ivaPct, iva, total: afecto + iva };
   }
 
+  /* ---------- plata recibida ----------
+     Lo abonado contra el total: es lo que uno necesita saber al entregar.
+     El saldo nunca baja de cero, aunque el abono se pase. */
+  const pagado = (q) => (q.pagos || []).reduce((s, p) => s + Math.max(0, MQ.num(p.monto, 0)), 0);
+  function pagos(q, cat, empresa) {
+    const total = totales(q, cat, empresa).total;
+    const ab = pagado(q);
+    return { total, pagado: ab, saldo: Math.max(0, total - ab), pct: total > 0 ? Math.min(100, ab / total * 100) : 0 };
+  }
+
   /* ---------- lista de compra ----------
      Junta las líneas de todas las partidas por ítem, multiplicadas por la
      cantidad de cada partida. Los cortes se conservan para la hoja de taller. */
@@ -151,5 +161,5 @@ MQ.calc = (function () {
     return MQ.dec(cant, entero ? 0 : 2) + " " + u.nombre;
   }
 
-  return { costear, totales, listaCompra, lineasCroquis, cantidad, esLineal, item, conUnidad, cortesDe, textoCorte };
+  return { costear, totales, listaCompra, lineasCroquis, cantidad, esLineal, item, conUnidad, cortesDe, textoCorte, pagado, pagos };
 })();
