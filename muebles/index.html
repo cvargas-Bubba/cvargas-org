@@ -24,6 +24,7 @@
     <nav class="tabs" role="tablist" aria-label="Secciones">
       <button class="tab" role="tab" data-view="cotizar" aria-selected="true">Cotizar</button>
       <button class="tab" role="tab" data-view="materiales" aria-selected="false">Materiales</button>
+      <button class="tab" role="tab" data-view="clientes" aria-selected="false">Clientes</button>
       <button class="tab" role="tab" data-view="historial" aria-selected="false">Historial</button>
       <button class="tab" role="tab" data-view="empresa" aria-selected="false">Empresa</button>
     </nav>
@@ -33,6 +34,15 @@
 
 <!-- ============ COTIZAR ============ -->
 <main class="view" id="view-cotizar">
+  <div class="aviso" id="avisoInicio" hidden>
+    <span id="avisoTexto"></span>
+    <div class="aviso-a">
+      <button class="btn btn-sm" id="avisoRetomar" hidden>Retomar</button>
+      <button class="btn btn-ghost btn-sm" id="avisoAbrir" hidden>Abrir una guardada</button>
+      <button class="btn btn-ghost btn-sm" id="avisoCerrar">Empezar en blanco</button>
+    </div>
+  </div>
+
   <div class="workspace">
 
     <section class="panel" id="panelPartida">
@@ -150,13 +160,21 @@
             <button class="btn btn-ghost btn-sm" id="clientEdit" aria-expanded="false" aria-controls="clientForm">Datos del cliente</button>
           </div>
           <div class="client-form" id="clientForm" hidden>
+            <div class="field">
+              <label for="cPick">De la libreta</label>
+              <div class="pick">
+                <select class="select" id="cPick"></select>
+                <button type="button" class="btn btn-ghost btn-sm" id="cNuevo">Otro cliente</button>
+              </div>
+            </div>
             <div class="field"><label for="cNombre">Nombre o razón social</label><input class="input" id="cNombre" autocomplete="off"></div>
             <div class="row2">
               <div class="field"><label for="cRut">RUT</label><input class="input" id="cRut" autocomplete="off"></div>
               <div class="field"><label for="cTelefono">Teléfono</label><input class="input" id="cTelefono" inputmode="tel" autocomplete="off"></div>
             </div>
             <div class="field"><label for="cEmail">Correo</label><input class="input" id="cEmail" type="email" autocomplete="off"></div>
-            <div class="field"><label for="cObra">Obra / dirección</label><input class="input" id="cObra" autocomplete="off"></div>
+            <div class="field"><label for="cObra">Obra / dirección <span class="opt">de este trabajo</span></label><input class="input" id="cObra" autocomplete="off"></div>
+            <p class="hint" id="cEstado"></p>
           </div>
         </div>
 
@@ -249,6 +267,32 @@
     <div class="panel-b">
       <p class="hint">Partidas guardadas para reusar, con su croquis y sus materiales.</p>
       <div id="listaPlantillas"></div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ CLIENTES ============ -->
+<main class="view" id="view-clientes" hidden>
+  <div class="settings-intro">
+    <div>
+      <h1 class="h-big">Clientes</h1>
+      <p>La libreta del taller. Lo que edites acá se guarda solo; las cotizaciones ya hechas conservan los datos que tenían cuando se hicieron.</p>
+    </div>
+    <div class="intro-actions">
+      <button class="btn btn-primary" id="addCliente">Agregar cliente</button>
+    </div>
+  </div>
+
+  <div class="list-tools">
+    <input class="input" id="cliSearch" type="search" placeholder="Buscar por nombre, teléfono o correo">
+  </div>
+
+  <section class="panel">
+    <div class="panel-b">
+      <div class="tbl-wrap"><table class="tbl" id="tblClientes"><thead><tr>
+        <th>Nombre</th><th>RUT</th><th>Teléfono</th><th>Correo</th><th>Notas</th><th>Trabajos</th><th></th>
+      </tr></thead><tbody></tbody></table></div>
+      <p class="hint" id="cliVacio" hidden>Todavía no hay clientes. Se agregan solos al escribir el nombre en una cotización.</p>
     </div>
   </section>
 </main>

@@ -135,6 +135,61 @@ MQ.store = (function () {
   S.loadDraft = () => sanear(LS.get("draft"));
   S.saveDraft = (q) => LS.set("draft", q);
 
+  /* Lo que quedó a medio hacer la vez anterior. Se guarda aparte porque la
+     app parte en blanco: el borrador se pisa apenas uno toca algo, y esto
+     tiene que sobrevivir hasta que se decida retomarlo o botarlo. */
+  S.loadPendiente = () => sanear(LS.get("pendiente"));
+  S.savePendiente = (q) => LS.set("pendiente", q);
+  S.clearPendiente = () => LS.set("pendiente", null);
+
+  /* ---------- clientes ----------
+     La libreta del taller. La cotización guarda `clienteId` y además una
+     copia de los datos: así un trabajo viejo sigue diciendo a qué teléfono
+     se llamó entonces, aunque el cliente después se cambie de casa. */
+  const normNombre = (s) => String(s || "").trim().toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const porNombre = (a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es");
+
+  S.clientes = (LS.get("clientes") || []).filter((c) => c && c.id).sort(porNombre);
+  function escribirClientes() {
+    S.clientes.sort(porNombre);
+    LS.set("clientes", S.clientes);
+    emit("clientes");
+  }
+
+  S.cliente = (id) => S.clientes.find((c) => c.id === id) || null;
+  S.clientePorNombre = function (n) {
+    const k = normNombre(n);
+    return k ? S.clientes.find((c) => normNombre(c.nombre) === k) || null : null;
+  };
+
+  S.saveCliente = function (c) {
+    const ahora = new Date().toISOString();
+    const existe = c.id && S.cliente(c.id);
+    if (existe) {
+      Object.assign(existe, MQ.clone(c), { actualizado: ahora });
+      escribirClientes();
+      return existe;
+    }
+    const body = Object.assign({ id: MQ.uid(), creado: ahora }, MQ.clone(c), { actualizado: ahora });
+    S.clientes.push(body);
+    escribirClientes();
+    return body;
+  };
+
+  S.deleteCliente = function (id) {
+    S.clientes = S.clientes.filter((c) => c.id !== id);
+    escribirClientes();
+  };
+
+  /* los trabajos de un cliente: por vínculo, y si no por nombre, para que
+     las cotizaciones de antes de la libreta también aparezcan */
+  S.trabajosDe = function (c) {
+    if (!c) return [];
+    const k = normNombre(c.nombre);
+    return S.quotes.filter((q) => q.clienteId === c.id || (!q.clienteId && k && normNombre((q.cliente || {}).nombre) === k));
+  };
+
   /* ---------- plantillas ----------
      Una partida que se guarda para reusar: el reemplazo de los tipos de
      mueble, pero hecho de lo que uno ya cotizó. */

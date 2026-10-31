@@ -222,6 +222,19 @@ img, svg { max-width: 100%; }
 .list-tools { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 .list-tools .input { flex: 1 1 240px; }
 .list-tools .select { width: auto; }
+/* ---------- aviso de arranque ---------- */
+.aviso { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; background: var(--panel); border: 1px solid color-mix(in srgb, var(--acento) 35%, var(--linea)); border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; font-size: 13.5px; }
+.aviso-a { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ---------- clientes ---------- */
+.pick { display: flex; gap: 8px; align-items: center; }
+.pick .select { min-width: 0; flex: 1 1 auto; }
+/* la libreta tiene muchas columnas: antes de apretarlas hasta no leerse,
+   la tabla se desplaza de lado dentro de su marco */
+#tblClientes { min-width: 860px; }
+.cli-a { display: flex; gap: 6px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+.cli-t { color: var(--suave); font-size: 13px; }
+
 /* ---------- seguimiento del trabajo ---------- */
 .seguimiento { margin-bottom: 10px; }
 .etapas { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }

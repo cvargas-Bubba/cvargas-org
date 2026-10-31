@@ -22,6 +22,7 @@
   function nuevaCotizacion() {
     return {
       id: MQ.uid(), numero: 0, estado: "borrador", creado: new Date().toISOString(),
+      clienteId: "",
       cliente: { nombre: "", rut: "", telefono: "", email: "", obra: "" },
       partidas: [], descuento: 0, notas: "",
       hitos: {}, pagos: []
@@ -275,13 +276,119 @@
   }
 
   function volcarHoja() {
+    /* al abrir, retomar o empezar otra, el aviso de arranque ya no aplica */
+    $("avisoInicio").hidden = true;
+    volcarCliente();
+    $("qDescuento").value = quote.descuento || 0;
+    $("qNotas").value = quote.notas || "";
+    pintarSeguimiento();
+  }
+
+  /* una cotización tiene algo que perder si ya hay partidas o un cliente */
+  const hayTrabajo = (q) => {
+    const x = q || quote;
+    return !!((x.partidas || []).length || ((x.cliente || {}).nombre || "").trim());
+  };
+
+  function empezarNueva(cli) {
+    quote = nuevaCotizacion();
+    if (cli) {
+      quote.clienteId = cli.id;
+      CAMPOS_CLIENTE.forEach((k) => { quote.cliente[k] = cli[k] || ""; });
+    }
+    seleccionarPartida(null);
+    volcarHoja(); pintarHoja();
+    verVista("cotizar");
+  }
+
+  function nuevaParaCliente(c) {
+    if (hayTrabajo() && !confirm("¿Empezar una cotización para " + (c.nombre || "este cliente") + "? Lo que no hayas guardado se pierde.")) return;
+    empezarNueva(c);
+    MQ.toast("Cotización nueva para " + (c.nombre || "el cliente"));
+  }
+
+  /* ================= CLIENTES =================
+     La cotización guarda el vínculo y además una copia de los datos. El
+     vínculo sirve para juntar los trabajos de un cliente; la copia, para que
+     un trabajo viejo siga diciendo a quién se le hizo. */
+  const CAMPOS_CLIENTE = ["nombre", "rut", "telefono", "email"];
+
+  function pintarPickCliente() {
+    const sel = quote.clienteId || "";
+    $("cPick").innerHTML = `<option value="">— Cliente nuevo —</option>` + S.clientes.map((c) =>
+      `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.nombre || "Sin nombre")}</option>`).join("");
+    const c = quote.clienteId && S.cliente(quote.clienteId);
+    const n = c ? S.trabajosDe(c).length : 0;
+    $("cEstado").textContent = c
+      ? "Guardado en la libreta" + (n ? " · " + n + (n === 1 ? " trabajo" : " trabajos") : "")
+      : ($("cNombre").value.trim() ? "Se guardará en la libreta al salir del campo." : "");
+  }
+
+  /* Al salir de un campo del cliente: si está vinculado se actualiza su
+     ficha, y si no, se busca por nombre antes de crear otra, para no llenar
+     la libreta del mismo cliente escrito dos veces. */
+  function sincronizarCliente() {
+    const d = quote.cliente || {};
+    const datos = {};
+    CAMPOS_CLIENTE.forEach((k) => { datos[k] = d[k] || ""; });
+    if (quote.clienteId && S.cliente(quote.clienteId)) {
+      S.saveCliente(Object.assign({ id: quote.clienteId }, datos));
+    } else if ((datos.nombre || "").trim().length >= 2) {
+      const ya = S.clientePorNombre(datos.nombre);
+      const g = S.saveCliente(ya ? Object.assign({ id: ya.id }, datos) : datos);
+      quote.clienteId = g.id;
+      persistir(false);
+    }
+    pintarPickCliente();
+  }
+
+  function usarCliente(id) {
+    const c = S.cliente(id);
+    quote.clienteId = c ? c.id : "";
+    if (c) CAMPOS_CLIENTE.forEach((k) => { quote.cliente[k] = c[k] || ""; });
+    else CAMPOS_CLIENTE.forEach((k) => { quote.cliente[k] = ""; });
+    /* la obra es de este trabajo, no del cliente: se deja como está */
+    volcarCliente();
+    persistir(false);
+    pintarHoja();
+  }
+
+  function volcarCliente() {
     const c = quote.cliente || {};
     $("cNombre").value = c.nombre || ""; $("cRut").value = c.rut || "";
     $("cTelefono").value = c.telefono || ""; $("cEmail").value = c.email || "";
     $("cObra").value = c.obra || "";
-    $("qDescuento").value = quote.descuento || 0;
-    $("qNotas").value = quote.notas || "";
-    pintarSeguimiento();
+    pintarPickCliente();
+  }
+
+  function pintarClientes() {
+    const q = ($("cliSearch").value || "").toLowerCase().trim();
+    const lista = S.clientes.filter((c) => !q ||
+      [c.nombre, c.telefono, c.email, c.rut].filter(Boolean).some((s) => String(s).toLowerCase().includes(q)));
+    const inp = (c, campo, ph) =>
+      `<input class="input cell" value="${esc(c[campo] || "")}" data-cli="${esc(c.id)}" data-campo="${campo}"${ph ? ` placeholder="${esc(ph)}"` : ""}>`;
+
+    $("tblClientes").querySelector("tbody").innerHTML = lista.map((c) => {
+      const t = S.trabajosDe(c);
+      const deuda = t.reduce((s, x) => s + MQ.calc.pagos(x, S.catalogo, S.empresa).saldo, 0);
+      const activos = t.filter((x) => ["borrador", "rechazada"].indexOf(x.estado) < 0);
+      return `<tr>
+        <td>${inp(c, "nombre")}</td>
+        <td class="w140">${inp(c, "rut")}</td>
+        <td class="w140">${inp(c, "telefono")}</td>
+        <td>${inp(c, "email")}</td>
+        <td>${inp(c, "notas", "Preferencias, referencias…")}</td>
+        <td class="w140 mono cli-t">${t.length || "—"}${deuda > 0 && activos.length ? `<span class="hc-saldo">debe ${MQ.clp(deuda)}</span>` : ""}</td>
+        <td class="cli-a">
+          <button class="btn btn-ghost btn-sm" data-cli-act="cotizar" data-cli="${esc(c.id)}">Cotizar</button>
+          <button class="btn btn-ghost btn-sm" data-cli-act="ver" data-cli="${esc(c.id)}"${t.length ? "" : " disabled"}>Trabajos</button>
+          <button class="icon" data-cli-act="del" data-cli="${esc(c.id)}" title="Eliminar" aria-label="Eliminar">✕</button>
+        </td>
+      </tr>`;
+    }).join("");
+    $("cliVacio").hidden = !!lista.length;
+    if (!lista.length && q) $("cliVacio").textContent = "Ningún cliente coincide con la búsqueda.";
+    else $("cliVacio").textContent = "Todavía no hay clientes. Se agregan solos al escribir el nombre en una cotización.";
   }
 
   /* ================= SEGUIMIENTO DEL TRABAJO =================
@@ -530,6 +637,7 @@
     document.querySelectorAll(".view").forEach((el) => { el.hidden = el.id !== "view-" + v; });
     document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === v)));
     if (v === "historial") pintarHistorial();
+    if (v === "clientes") pintarClientes();
     if (v === "materiales") pintarCatalogo();
     if (v === "empresa") pintarEmpresa();
     if (v === "cotizar" && croquis && partida()) croquis.pintar();
@@ -712,6 +820,65 @@
       $(id).addEventListener("change", () => { leerHoja(); pintarHoja(); });
     });
 
+    /* ---- cliente ---- */
+    ["cNombre", "cRut", "cTelefono", "cEmail"].forEach((id) => {
+      /* al salir del campo, no en cada tecla: si no, un nombre a medio
+         escribir entraría a la libreta como cliente nuevo */
+      $(id).addEventListener("change", () => { leerHoja(); sincronizarCliente(); });
+    });
+    $("cNombre").addEventListener("input", pintarPickCliente);
+    $("cPick").addEventListener("change", () => usarCliente($("cPick").value));
+    $("cNuevo").addEventListener("click", () => {
+      quote.clienteId = "";
+      CAMPOS_CLIENTE.forEach((k) => { quote.cliente[k] = ""; });
+      quote.cliente.obra = "";
+      volcarCliente(); pintarHoja();
+      $("cNombre").focus();
+    });
+
+    $("cliSearch").addEventListener("input", pintarClientes);
+    $("addCliente").addEventListener("click", () => {
+      const c = S.saveCliente({ nombre: "" });
+      $("cliSearch").value = "";
+      pintarClientes();
+      const f = document.querySelector(`[data-cli="${c.id}"][data-campo="nombre"]`);
+      if (f) f.focus();
+    });
+    $("tblClientes").addEventListener("change", (ev) => {
+      const t = ev.target;
+      if (!t.dataset.cli || !t.dataset.campo) return;
+      const c = S.cliente(t.dataset.cli);
+      if (!c) return;
+      const datos = { id: c.id }; datos[t.dataset.campo] = t.value;
+      S.saveCliente(datos);
+      /* si es el cliente de la cotización abierta, que no quede desfasada */
+      if (quote.clienteId === c.id && CAMPOS_CLIENTE.indexOf(t.dataset.campo) >= 0) {
+        quote.cliente[t.dataset.campo] = t.value;
+        volcarCliente(); persistir(false); pintarHoja();
+      }
+      pintarClientes();
+    });
+    $("tblClientes").addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-cli-act]");
+      if (!b) return;
+      const c = S.cliente(b.dataset.cli);
+      if (!c) return;
+      if (b.dataset.cliAct === "cotizar") {
+        nuevaParaCliente(c);
+      } else if (b.dataset.cliAct === "ver") {
+        $("histSearch").value = c.nombre || "";
+        $("histFilter").value = "";
+        verVista("historial");
+      } else {
+        const n = S.trabajosDe(c).length;
+        if (!confirm("¿Eliminar a " + (c.nombre || "este cliente") + " de la libreta?" +
+          (n ? "\nSus " + n + " cotizaciones se mantienen." : ""))) return;
+        S.deleteCliente(c.id);
+        if (quote.clienteId === c.id) { quote.clienteId = ""; persistir(false); volcarCliente(); }
+        pintarClientes();
+      }
+    });
+
     /* ---- seguimiento ---- */
     $("etapas").addEventListener("click", (ev) => {
       const b = ev.target.closest("[data-etapa]");
@@ -775,10 +942,8 @@
     });
 
     $("btnNew").addEventListener("click", () => {
-      if (quote.partidas.length && !confirm("¿Empezar una cotización nueva? Lo que no hayas guardado se pierde.")) return;
-      quote = nuevaCotizacion();
-      seleccionarPartida(null);
-      volcarHoja(); pintarHoja();
+      if (hayTrabajo() && !confirm("¿Empezar una cotización nueva? Lo que no hayas guardado se pierde.")) return;
+      empezarNueva(null);
       MQ.toast("Cotización nueva");
     });
 
@@ -967,18 +1132,62 @@
       if (kind === "catalogo") { pintarBarraMaterial(); pintarLineas(); }
       if (kind === "catalogo" || kind === "empresa") pintarHoja();
       if (kind === "plantillas") pintarPlantillas();
+      if (kind === "clientes" && !$("view-clientes").hidden) pintarClientes();
+      if (kind === "quotes" && !$("view-historial").hidden) pintarHistorial();
     });
   }
 
-  /* ================= ARRANQUE ================= */
+  /* ================= ARRANQUE =================
+     La app parte en blanco, lista para cotizar. Lo que quedó a medio hacer
+     no se pierde: se guarda aparte y se ofrece retomarlo, igual que abrir
+     una de las guardadas. */
+  function pintarAviso(pendiente) {
+    const hay = pendiente && hayTrabajo(pendiente);
+    const guardadas = S.quotes.length;
+    if (!hay && !guardadas) { $("avisoInicio").hidden = true; return; }
+
+    if (hay) {
+      const c = (pendiente.cliente || {}).nombre;
+      const n = (pendiente.partidas || []).length;
+      $("avisoTexto").textContent = "Quedó una cotización a medio hacer" +
+        (c ? " de " + c : "") + (n ? " · " + n + (n === 1 ? " partida" : " partidas") : "") + ".";
+    } else {
+      $("avisoTexto").textContent = "Tienes " + guardadas + (guardadas === 1 ? " cotización guardada" : " cotizaciones guardadas") + ".";
+    }
+    $("avisoRetomar").hidden = !hay;
+    $("avisoAbrir").hidden = !guardadas;
+    $("avisoCerrar").textContent = hay ? "Descartarla" : "Entendido";
+    $("avisoInicio").hidden = false;
+  }
+
   function iniciar() {
-    quote = S.loadDraft() || nuevaCotizacion();
+    /* lo del cierre anterior se pone a salvo antes de que la hoja en blanco
+       pise el borrador, que se reescribe apenas se pinta */
+    const previo = S.loadDraft();
+    if (previo && hayTrabajo(previo)) S.savePendiente(previo);
+    const pendiente = S.loadPendiente();
+
+    quote = nuevaCotizacion();
     montarCroquis();
     conectar();
     volcarHoja();
     $("crAyuda").textContent = AYUDA.sel;
-    seleccionarPartida(quote.partidas.length ? quote.partidas[0].id : null);
+    seleccionarPartida(null);
     verVista("cotizar");
+    pintarAviso(pendiente);
+
+    $("avisoRetomar").addEventListener("click", () => {
+      const p = S.loadPendiente();
+      if (!p) return;
+      quote = p;
+      S.clearPendiente();
+      $("avisoInicio").hidden = true;
+      volcarHoja();
+      seleccionarPartida(quote.partidas.length ? quote.partidas[0].id : null);
+      MQ.toast("Retomando lo que estaba a medio hacer");
+    });
+    $("avisoAbrir").addEventListener("click", () => { $("avisoInicio").hidden = true; verVista("historial"); });
+    $("avisoCerrar").addEventListener("click", () => { S.clearPendiente(); $("avisoInicio").hidden = true; });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar);
