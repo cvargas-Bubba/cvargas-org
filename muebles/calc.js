@@ -38,11 +38,30 @@ MQ.calc = (function () {
         id: "cro:" + o.id, itemId: it.id, cat: it.cat, origen: "croquis", vista: v.nombre,
         nombre: MQ.nombreItem(it), unidad: it.unidad, lineal: true,
         largo, piezas, nota: "",
+        /* los lados por separado: el marco se compra entero pero se corta así */
+        cortes: MQ.croquis.ladosMm(o, mm).map((x) => ({ largo: x.largo, piezas: x.piezas * piezas })),
         cant: (largo / 1000) * piezas, precio: it.precio,
         total: (largo / 1000) * piezas * MQ.num(it.precio, 0)
       });
     }));
     return out;
+  }
+
+  /* Los cortes de una línea. Los del croquis vienen desglosados por lado;
+     una línea escrita a mano es un solo largo repetido. */
+  function cortesDe(l) {
+    if (l.cortes && l.cortes.length) return l.cortes;
+    return l.lineal && l.largo > 0 && l.piezas > 0 ? [{ largo: l.largo, piezas: l.piezas }] : [];
+  }
+
+  /* Cómo se escribe el corte de una línea. Una figura cerrada se desglosa en
+     sus lados, que es como se corta en el banco; si son demasiados distintos
+     —un trazo a mano alzada— el total es lo único que sirve. */
+  function textoCorte(l) {
+    if (!l.lineal) return "—";
+    const c = cortesDe(l);
+    if (c.length > 1 && c.length <= 3) return c.map((x) => x.piezas + " × " + x.largo).join(" + ") + " mm";
+    return l.largo + " mm × " + l.piezas;
   }
 
   /* ---------- una partida ---------- */
@@ -109,11 +128,11 @@ MQ.calc = (function () {
         });
         g.cant += l.cant * c.cantidad;
         g.total += l.total * c.cantidad;
-        if (l.lineal && l.largo > 0 && l.piezas > 0) {
-          const corte = g.cortes.find((x) => x.largo === l.largo);
-          if (corte) corte.piezas += l.piezas * c.cantidad;
-          else g.cortes.push({ largo: l.largo, piezas: l.piezas * c.cantidad });
-        }
+        cortesDe(l).forEach((x) => {
+          const corte = g.cortes.find((y) => y.largo === x.largo);
+          if (corte) corte.piezas += x.piezas * c.cantidad;
+          else g.cortes.push({ largo: x.largo, piezas: x.piezas * c.cantidad });
+        });
       });
     });
     const lista = Object.keys(acum).map((k) => acum[k]);
@@ -132,5 +151,5 @@ MQ.calc = (function () {
     return MQ.dec(cant, entero ? 0 : 2) + " " + u.nombre;
   }
 
-  return { costear, totales, listaCompra, lineasCroquis, cantidad, esLineal, item, conUnidad };
+  return { costear, totales, listaCompra, lineasCroquis, cantidad, esLineal, item, conUnidad, cortesDe, textoCorte };
 })();

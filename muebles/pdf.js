@@ -284,8 +284,9 @@ MQ.pdf = (function () {
       c.lineas.forEach((l) => {
         y = salto(doc, y, 8, empresa, titulo, quote.numero);
         doc.setFont("helvetica", "normal").setFontSize(8.5).setTextColor.apply(doc, NEGRO);
-        doc.text(doc.splitTextToSize(l.nombre, 56)[0], M, y);
-        doc.text(l.lineal ? l.largo + " mm × " + l.piezas : "—", 104, y, { align: "right" });
+        /* 50 mm para el nombre: el corte desglosado de un marco ocupa lo suyo */
+        doc.text(doc.splitTextToSize(l.nombre, 50)[0], M, y);
+        doc.text(MQ.calc.textoCorte(l), 104, y, { align: "right" });
         doc.text(MQ.calc.conUnidad(l.cant, l.unidad), 140, y, { align: "right" });
         doc.setFontSize(7.5).setTextColor.apply(doc, GRIS);
         doc.text(l.origen === "croquis" ? (l.vista || "croquis") : "a mano", 160, y, { align: "right" });
@@ -324,12 +325,17 @@ MQ.pdf = (function () {
       doc.setFont("helvetica", "bold");
       doc.text(MQ.calc.conUnidad(g.cant, g.unidad), 120, y, { align: "right" });
       doc.setFont("helvetica", "normal").setTextColor.apply(doc, GRIS).setFontSize(7.5);
+      /* los cortes pueden ser varios por ítem: se les deja una segunda línea
+         antes de recortarlos, porque es con esto que se va al banco */
+      let extra = 0;
       if (g.cortes.length) {
-        doc.text(doc.splitTextToSize(g.cortes.map((x) => x.piezas + " de " + x.largo).join(" · "), 60)[0], 124, y);
+        const t = doc.splitTextToSize(g.cortes.map((x) => x.piezas + " de " + x.largo).join(" · "), 60).slice(0, 2);
+        doc.text(t, 124, y);
+        extra = (t.length - 1) * 3.4;
       }
       doc.setTextColor.apply(doc, NEGRO).setFontSize(9);
       doc.text(MQ.clp(g.total), ANCHO - M, y, { align: "right" });
-      y += 4.6;
+      y += 4.6 + extra;
     });
 
     const total = L.reduce((s, g) => s + g.total, 0);

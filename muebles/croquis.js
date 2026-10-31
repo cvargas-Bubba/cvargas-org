@@ -61,6 +61,33 @@ MQ.croquis = (function () {
   }
   const piezasDe = (o) => Math.max(1, Math.round(MQ.num(o && o.piezas, 1)));
 
+  /* ---------- los cortes de una figura ----------
+     Para comprar basta el total, pero en el banco se corta pieza por pieza:
+     un marco de 1000 × 500 son dos de 1000 y dos de 500. Del trazo a mano
+     alzada no sale ningún corte útil, así que va entero. */
+  function ladosMm(o, mm) {
+    const out = [];
+    if (!o || o.t === "texto") return out;
+    if (o.t === "lapiz") {
+      const l = Math.round(largoMm(o, mm));
+      return l > 0 ? [{ largo: l, piezas: 1 }] : out;
+    }
+    const sumar = (v) => {
+      const l = Math.round(v);
+      if (l <= 0) return;
+      const y = out.find((x) => x.largo === l);
+      if (y) y.piezas += 1; else out.push({ largo: l, piezas: 1 });
+    };
+    const v = vertices(o);
+    const n = cerrada(o) ? v.length : v.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = v[i], b = v[(i + 1) % v.length];
+      sumar(Math.hypot(b.x - a.x, b.y - a.y) * mm);
+    }
+    out.sort((a, b) => b.largo - a.largo);
+    return out;
+  }
+
   function caja(o) {
     if (o.t === "texto") {
       const an = Math.max(24, o.s.length * 7);
@@ -557,5 +584,5 @@ MQ.croquis = (function () {
     };
   }
 
-  return { figura, montar, vacio, vistaVacia, conDibujo, mmPorUnidad, largoMm, piezasDe, cerrada, W, H, CELDA };
+  return { figura, montar, vacio, vistaVacia, conDibujo, mmPorUnidad, largoMm, ladosMm, piezasDe, cerrada, W, H, CELDA };
 })();

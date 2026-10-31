@@ -127,7 +127,7 @@
     $("lineasCroquis").innerHTML = delCroquis.length ? delCroquis.map((l) => `
       <div class="lin lin-ro">
         <span class="lin-n">${esc(l.nombre)}<span class="lin-v">${esc(l.vista)}</span></span>
-        <span class="lin-d mono">${l.largo} mm × ${l.piezas}</span>
+        <span class="lin-d mono">${esc(MQ.calc.textoCorte(l))}</span>
         <span class="lin-c mono">${esc(MQ.calc.conUnidad(l.cant, l.unidad))}</span>
         <span class="lin-t mono">${MQ.clp(l.total)}</span>
       </div>`).join("") : `<p class="hint lin-vacio">Asigna material a las figuras del croquis y aparecen acá con su largo.</p>`;
