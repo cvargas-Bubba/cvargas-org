@@ -1,14 +1,14 @@
-/* Interfaz: configurador de muebles, hoja de cotización, historial,
-   materiales y datos de la empresa. */
+/* Interfaz: partidas con su croquis y sus materiales, hoja de cotización,
+   catálogo, historial y datos de la empresa. */
 (function () {
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const S = MQ.store;
 
-  let quote = null;      // cotización en edición
-  let actual = null;     // mueble en el configurador
-  let editando = null;   // id del mueble que se está editando, o null
-  let croquis = null;    // editor de croquis, montado al arrancar
+  let quote = null;
+  let partidaId = null;   // partida que se está editando
+  let vistaId = null;     // vista del croquis en pantalla
+  let croquis = null;     // editor
 
   MQ.toast = function (msg) {
     const t = $("toast");
@@ -24,193 +24,167 @@
     return {
       id: MQ.uid(), numero: 0, estado: "borrador", creado: new Date().toISOString(),
       cliente: { nombre: "", rut: "", telefono: "", email: "", obra: "" },
-      muebles: [], descuento: 0, notas: "", croquis: MQ.croquis.nuevo()
+      partidas: [], descuento: 0, notas: ""
     };
   }
 
-  /* ---------- descripción corta de un mueble ---------- */
-  function descripcion(m) {
-    const t = MQ.tipo(m.tipo);
-    const usa = (p) => t.partes.indexOf(p) >= 0;
-    const partes = [];
-    if (usa("puertas") && m.puertas) partes.push(m.puertas + (m.puertas === 1 ? " puerta" : " puertas"));
-    if (usa("cajones") && m.cajones) partes.push(m.cajones + (m.cajones === 1 ? " cajón" : " cajones") + (usa("cajonCol") && m.cajonCol ? " en columna" : ""));
-    if (usa("entrepanos") && m.entrepanos) partes.push(m.entrepanos + (m.entrepanos === 1 ? " entrepaño" : " entrepaños"));
-    if (usa("barra") && m.barra) partes.push("barra");
-    if (usa("zocalo") && m.zocalo) partes.push("zócalo");
-    if (usa("cubierta") && m.cubierta) partes.push("cubierta");
-    if (m.instalar) partes.push("instalado");
-    return partes.join(" · ");
+  /* ---------- partida y vista en edición ---------- */
+  const partida = () => (quote.partidas || []).find((p) => p.id === partidaId) || null;
+  function vista() {
+    const p = partida();
+    if (!p) return null;
+    return p.croquis.vistas.find((v) => v.id === vistaId) || p.croquis.vistas[0];
   }
-  const medidas = (m) => m.tipo === "cubierta"
-    ? m.ancho + " × " + m.prof + " mm"
-    : m.ancho + " × " + m.alto + " × " + m.prof + " mm";
+  const guardarBorrador = () => S.saveDraft(quote);
 
-  /* ================= CONFIGURADOR ================= */
-  function pintarTipos() {
-    $("tipos").innerHTML = MQ.TIPOS.map((t) => `
-      <button type="button" class="tipo${actual && actual.tipo === t.id ? " on" : ""}" data-tipo="${t.id}">
-        <span class="tipo-n">${esc(t.nombre)}</span>
-        <span class="tipo-d">${esc(t.descripcion)}</span>
+  /* ================= CROQUIS ================= */
+  /* solo los materiales que se compran por metro pueden salir del dibujo:
+     en los demás la figura no dice cuánto hace falta */
+  const itemsLineales = () => (S.catalogo.items || []).filter((i) => MQ.calc.esLineal(i));
+
+  function pintarVistas() {
+    const p = partida();
+    if (!p) return;
+    const v = vista();
+    $("crVistas").innerHTML = p.croquis.vistas.map((x) => `
+      <button type="button" class="vtab${x.id === v.id ? " on" : ""}" data-vista="${esc(x.id)}">
+        ${esc(x.nombre)}${p.croquis.vistas.length > 1 ? `<span class="vtab-x" data-del-vista="${esc(x.id)}" title="Quitar vista">✕</span>` : ""}
       </button>`).join("");
   }
 
-  function pintarSelectsMaterial() {
-    const cat = S.catalogo;
-    const opts = (sel) => cat.tableros.map((t) => `<option value="${esc(t.id)}"${t.id === sel ? " selected" : ""}>${esc(t.nombre)}</option>`).join("");
-    $("fMatCuerpo").innerHTML = opts(actual.mat.cuerpo);
-    $("fMatFrente").innerHTML = opts(actual.mat.frente);
-    $("fMatTrasera").innerHTML = opts(actual.mat.trasera);
-    $("fMatCajon").innerHTML = opts(actual.mat.cajon);
-    $("fMatCubierta").innerHTML = opts(MQ.calc.matCubierta(actual));
+  function pintarBarraMaterial() {
+    if (!croquis) return;
+    const o = croquis.seleccionado();
+    $("crMatBar").hidden = !o;
+    if (!o) return;
+    const lista = itemsLineales();
+    $("crMat").innerHTML = `<option value="">Sin material</option>` + lista.map((i) =>
+      `<option value="${esc(i.id)}"${i.id === o.mat ? " selected" : ""}>${esc(MQ.nombreItem(i))}</option>`).join("");
+    $("crPiezas").value = MQ.croquis.piezasDe(o);
+
+    const p = partida();
+    const mm = MQ.croquis.mmPorUnidad(p.croquis);
+    const largo = Math.round(MQ.croquis.largoMm(o, mm));
+    const it = o.mat && MQ.calc.item(S.catalogo, o.mat);
+    const pz = MQ.croquis.piezasDe(o);
+    $("crMatCalc").textContent = it
+      ? largo + " mm × " + pz + " = " + MQ.dec(largo / 1000 * pz, 2) + " m · " + MQ.clp(largo / 1000 * pz * it.precio)
+      : largo + " mm";
   }
 
-  /* El mueble manda: el formulario muestra solo lo que el tipo usa */
-  function volcarFormulario() {
-    const t = MQ.tipo(actual.tipo);
-    $("fNombre").value = actual.nombre || "";
-    $("fAncho").value = actual.ancho;
-    $("fAlto").value = actual.alto;
-    $("fProf").value = actual.prof;
-    $("fPuertas").value = actual.puertas;
-    $("fCajones").value = actual.cajones;
-    $("fEntrepanos").value = actual.entrepanos;
-    $("fCajonCol").checked = !!actual.cajonCol;
-    $("fTrasera").checked = !!actual.trasera;
-    $("fZocalo").checked = !!actual.zocalo;
-    $("fCubierta").checked = !!actual.cubierta;
-    $("fBarra").checked = !!actual.barra;
-    $("fInstalar").checked = !!actual.instalar;
-    $("fCantidad").value = Math.max(1, actual.cantidad || 1);
+  const AYUDA = {
+    sel: "Haz clic en un trazo para seleccionarlo y arrástralo. Doble clic edita el texto de una cota o un rótulo. Con uno seleccionado puedes asignarle material.",
+    lapiz: "Dibuja arrastrando, como con un lápiz. No se ajusta a la grilla.",
+    linea: "Arrastra para dibujar la línea.",
+    rect: "Arrastra para dibujar el rectángulo.",
+    rombo: "Arrastra para dibujar el rombo dentro de ese recuadro.",
+    poli: "Un clic por cada punto. Doble clic termina; vuelve al primer punto para cerrar.",
+    texto: "Haz clic donde quieras el rótulo.",
+    cota: "Arrastra de un extremo al otro. La medida se calcula sola, y con doble clic la escribes tú."
+  };
 
-    document.querySelectorAll("[data-parte]").forEach((el) => {
-      const p = el.getAttribute("data-parte");
-      if (p === "alto") el.hidden = actual.tipo === "cubierta";
-      else if (p === "frente") el.hidden = actual.tipo === "cubierta";
-      /* el tablero de cubierta se elige en el mesón y en los muebles que la llevan */
-      else if (p === "matcubierta") el.hidden = actual.tipo !== "cubierta" && t.partes.indexOf("cubierta") < 0;
-      else el.hidden = t.partes.indexOf(p) < 0;
-    });
-    $("fMatCuerpo").closest(".field").hidden = actual.tipo === "cubierta";
-    pintarSelectsMaterial();
-    if (!actual.lineales) actual.lineales = [];
-    pintarLineales();
+  function montarCroquis() {
+    croquis = MQ.croquis.montar(
+      $("crLienzo"),
+      () => ({ croquis: partida().croquis, vista: vista() }),
+      () => { guardarBorrador(); pintarBarraMaterial(); pintarLineas(); pintarHoja(); },
+      (id) => MQ.nombreCorto(MQ.calc.item(S.catalogo, id))
+    );
   }
 
-  function leerFormulario() {
-    const t = MQ.tipo(actual.tipo);
-    const usa = (p) => t.partes.indexOf(p) >= 0;
-    const ent = (v, min, max) => Math.min(max, Math.max(min, Math.round(MQ.num(v, min))));
-    actual.nombre = $("fNombre").value.trim();
-    actual.ancho = ent($("fAncho").value, 50, 6000);
-    actual.prof = ent($("fProf").value, 50, 1200);
-    actual.mat = {
-      cuerpo: $("fMatCuerpo").value, frente: $("fMatFrente").value,
-      trasera: $("fMatTrasera").value, cajon: $("fMatCajon").value,
-      cubierta: $("fMatCubierta").value
-    };
-    /* en un mesón el alto no se escribe: es el espesor del tablero elegido */
-    actual.alto = actual.tipo === "cubierta"
-      ? MQ.calc.tablero(S.catalogo, actual.mat.cubierta).espesor
-      : ent($("fAlto").value, 50, 3000);
-    actual.puertas = usa("puertas") ? ent($("fPuertas").value, 0, 8) : 0;
-    actual.cajones = usa("cajones") ? ent($("fCajones").value, 0, 10) : 0;
-    actual.entrepanos = usa("entrepanos") ? ent($("fEntrepanos").value, 0, 12) : 0;
-    actual.cajonCol = usa("cajonCol") && $("fCajonCol").checked;
-    actual.trasera = usa("trasera") && $("fTrasera").checked;
-    actual.zocalo = usa("zocalo") && $("fZocalo").checked;
-    actual.cubierta = usa("cubierta") && $("fCubierta").checked;
-    actual.barra = usa("barra") && $("fBarra").checked;
-    actual.instalar = $("fInstalar").checked;
-    actual.cantidad = ent($("fCantidad").value, 1, 99);
-    leerLineales();
-  }
-
-  function pintarConfigurador() {
-    const cat = S.catalogo;
-    const c = MQ.calc.costear(actual, cat);
-    $("esquema").innerHTML = MQ.draw.esquema(actual, cat);
-    $("precioUnit").textContent = MQ.clp(c.unitario);
-
-    const piezasTotal = c.piezas.reduce((s, p) => s + p.cant, 0);
-    const m2 = c.tableros.reduce((s, t) => s + t.m2, 0);
-    const ml = c.cantos.reduce((s, x) => s + x.ml, 0);
-    $("resumenPiezas").innerHTML = [
-      ["Piezas", piezasTotal],
-      ["Tablero", m2.toFixed(2) + " m²"],
-      ["Canto", ml.toFixed(1) + " m"]
-    ].map(([k, v]) => `<div><dt>${k}</dt><dd class="mono">${esc(v)}</dd></div>`).join("");
-
-    const d = c.costos;
-    $("desglose").innerHTML = [
-      ["Tableros", d.tableros], ["Madera y perfiles", d.lineales], ["Cantos", d.cantos],
-      ["Herrajes", d.herrajes], ["Mano de obra", d.mano], ["Gastos y margen", d.gastos + d.margen]
-    ].filter(([, v]) => v > 0).map(([k, v]) => `<span>${k} <b class="mono">${MQ.clp(v)}</b></span>`).join("");
-
-    /* el total de cada fila se actualiza sin rehacerla, para no perder el
-       foco mientras se escribe el largo o la cantidad */
-    c.lineales.forEach((l, i) => {
-      const el = $("lineales").querySelector(`[data-m="${i}"]`);
-      if (el) el.textContent = l.metros.toFixed(2).replace(".", ",") + " m · " + MQ.clp(l.total);
-    });
-    $("linAyuda").textContent = c.cubiertaDeMadera
-      ? "La cubierta se arma con estas piezas: no se cobra tablero."
-      : "Piezas que compras por metro: escuadría, largo de cada pieza y cuántas van.";
-    $("linAyuda").classList.toggle("aviso", !!c.cubiertaDeMadera);
-
-    $("addItem").textContent = editando ? "Guardar cambios" : "Agregar a la cotización";
-    $("cancelEdit").hidden = !editando;
-  }
-
-  /* ---------- madera y perfiles ---------- */
-  function opcionesLineal(clase, sel) {
-    const lista = clase === "perfil" ? (S.catalogo.perfiles || []) : (S.catalogo.escuadrias || []);
-    return lista.map((x) => {
-      const n = clase === "perfil" ? x.nombre : MQ.calc.nombreEscuadria(x);
-      return `<option value="${esc(x.id)}"${x.id === sel ? " selected" : ""}>${esc(n)}</option>`;
+  /* ================= MATERIALES DE LA PARTIDA ================= */
+  function opcionesItem(sel) {
+    return MQ.CATEGORIAS.map((c) => {
+      const its = (S.catalogo.items || []).filter((i) => i.cat === c.id);
+      if (!its.length) return "";
+      return `<optgroup label="${esc(c.nombre)}">` + its.map((i) =>
+        `<option value="${esc(i.id)}"${i.id === sel ? " selected" : ""}>${esc(MQ.nombreItem(i))}</option>`).join("") + `</optgroup>`;
     }).join("");
   }
 
-  function pintarLineales() {
-    const ls = actual.lineales || [];
-    $("lineales").innerHTML = ls.length ? ls.map((l, i) => `
-      <div class="lineal">
-        <span class="lineal-k">${l.clase === "perfil" ? "Perfil" : "Madera"}</span>
-        <select class="select" data-campo="matId" data-i="${i}" aria-label="Material">${opcionesLineal(l.clase, l.matId)}</select>
-        <div class="unit" data-unit="mm"><input class="input" data-campo="largo" data-i="${i}" inputmode="numeric" value="${esc(l.largo)}" aria-label="Largo de cada pieza"></div>
-        <div class="unit" data-unit="pzas"><input class="input" data-campo="cant" data-i="${i}" inputmode="numeric" value="${esc(l.cant)}" aria-label="Cantidad de piezas"></div>
-        <span class="lineal-m mono" data-m="${i}"></span>
-        <button class="icon" data-del-lineal="${i}" title="Quitar pieza" aria-label="Quitar pieza">✕</button>
-      </div>`).join("") : `<p class="hint lineal-vacio">Todavía no hay piezas de madera ni perfiles.</p>`;
+  function pintarLineas() {
+    const p = partida();
+    if (!p) return;
+    const c = MQ.calc.costear(p, S.catalogo);
+    const delCroquis = c.lineas.filter((l) => l.origen === "croquis");
+    const aMano = c.lineas.filter((l) => l.origen !== "croquis");
+
+    $("lineasCroquis").innerHTML = delCroquis.length ? delCroquis.map((l) => `
+      <div class="lin lin-ro">
+        <span class="lin-n">${esc(l.nombre)}<span class="lin-v">${esc(l.vista)}</span></span>
+        <span class="lin-d mono">${l.largo} mm × ${l.piezas}</span>
+        <span class="lin-c mono">${esc(MQ.calc.conUnidad(l.cant, l.unidad))}</span>
+        <span class="lin-t mono">${MQ.clp(l.total)}</span>
+      </div>`).join("") : `<p class="hint lin-vacio">Asigna material a las figuras del croquis y aparecen acá con su largo.</p>`;
+
+    $("croquisResumen").textContent = delCroquis.length
+      ? delCroquis.length + (delCroquis.length === 1 ? " pieza" : " piezas") + " · " + MQ.clp(delCroquis.reduce((s, l) => s + l.total, 0))
+      : "";
+
+    $("lineas").innerHTML = (p.lineas || []).map((l, i) => {
+      const it = MQ.calc.item(S.catalogo, l.itemId);
+      const lineal = MQ.calc.esLineal(it);
+      const calc = aMano.find((x) => x.id === l.id);
+      return `<div class="lin">
+        <select class="select" data-campo="itemId" data-i="${i}" aria-label="Material">${opcionesItem(l.itemId)}</select>
+        ${lineal
+          ? `<div class="unit" data-unit="mm"><input class="input" data-campo="largo" data-i="${i}" inputmode="numeric" value="${esc(l.largo)}" aria-label="Largo"></div>
+             <div class="unit" data-unit="pzas"><input class="input" data-campo="piezas" data-i="${i}" inputmode="numeric" value="${esc(l.piezas)}" aria-label="Piezas"></div>`
+          : `<div class="unit" data-unit="${esc(it ? (MQ.UNIDADES[it.unidad] || {}).nombre || "" : "")}"><input class="input" data-campo="cant" data-i="${i}" inputmode="decimal" value="${esc(l.cant)}" aria-label="Cantidad"></div>
+             <span></span>`}
+        <span class="lin-t mono">${calc ? MQ.clp(calc.total) : "$0"}</span>
+        <button class="icon" data-del-linea="${i}" title="Quitar" aria-label="Quitar material">✕</button>
+      </div>`;
+    }).join("") || `<p class="hint lin-vacio">Tornillos, cola, barniz, horas de taller: lo que no se dibuja va acá.</p>`;
+
+    $("partidaPrecio").textContent = MQ.clp(c.unitario);
+    $("partidaDesglose").innerHTML = c.porCategoria.map((x) =>
+      `<span>${esc(x.nombre)} <b class="mono">${MQ.clp(x.total)}</b></span>`).join("") +
+      (c.costos.gastos + c.costos.margen > 0 ? `<span>Gastos y margen <b class="mono">${MQ.clp(c.costos.gastos + c.costos.margen)}</b></span>` : "");
   }
 
-  function leerLineales() {
-    const ls = actual.lineales || [];
-    $("lineales").querySelectorAll("[data-campo]").forEach((el) => {
-      const l = ls[+el.dataset.i];
+  function leerLineas() {
+    const p = partida();
+    if (!p) return;
+    $("lineas").querySelectorAll("[data-campo]").forEach((el) => {
+      const l = p.lineas[+el.dataset.i];
       if (!l) return;
-      if (el.dataset.campo === "matId") l.matId = el.value;
-      else if (el.dataset.campo === "largo") l.largo = Math.min(12000, Math.max(0, Math.round(MQ.num(el.value, 0))));
-      else l.cant = Math.min(999, Math.max(0, Math.round(MQ.num(el.value, 0))));
+      const campo = el.dataset.campo;
+      if (campo === "itemId") l.itemId = el.value;
+      else if (campo === "largo") l.largo = Math.min(12000, Math.max(0, Math.round(MQ.num(el.value, 0))));
+      else if (campo === "piezas") l.piezas = Math.min(999, Math.max(0, Math.round(MQ.num(el.value, 0))));
+      else l.cant = Math.max(0, MQ.num(el.value, 0));
     });
   }
 
-  function agregarLineal(clase) {
-    const lista = clase === "perfil" ? (S.catalogo.perfiles || []) : (S.catalogo.escuadrias || []);
-    if (!lista.length) return MQ.toast("Primero agrega " + (clase === "perfil" ? "un perfil" : "una escuadría") + " en Materiales.");
-    actual.lineales = actual.lineales || [];
-    actual.lineales.push({ id: MQ.uid(), clase, matId: lista[0].id, largo: actual.ancho, cant: 1 });
-    pintarLineales(); pintarConfigurador();
+  /* ================= EDITOR DE LA PARTIDA ================= */
+  function pintarPartida() {
+    const p = partida();
+    $("partidaEditor").hidden = !p;
+    $("partidaVacia").hidden = !!p;
+    $("pPlantilla").hidden = !p;
+    $("pBorrar").hidden = !p;
+    if (!p) { $("partidaTitulo").textContent = "Partida"; return; }
+
+    $("partidaTitulo").textContent = p.nombre || "Partida sin nombre";
+    $("pNombre").value = p.nombre || "";
+    $("pDescripcion").value = p.descripcion || "";
+    $("pCantidad").value = Math.max(1, p.cantidad || 1);
+    $("crEscala").value = p.croquis.escala;
+    $("crAcotar").checked = p.croquis.acotar !== false;
+
+    if (!vista() || vistaId !== vista().id) vistaId = p.croquis.vistas[0].id;
+    pintarVistas();
+    if (croquis) croquis.reiniciar();
+    pintarBarraMaterial();
+    pintarLineas();
   }
 
-  function refrescarConfig() { leerFormulario(); pintarConfigurador(); }
-
-  function elegirTipo(id) {
-    const cantidad = actual ? actual.cantidad : 1;
-    const nombre = actual ? actual.nombre : "";
-    actual = MQ.nuevoMueble(id);
-    actual.cantidad = cantidad; actual.nombre = nombre;
-    pintarTipos(); volcarFormulario(); pintarConfigurador();
+  function seleccionarPartida(id) {
+    partidaId = id;
+    vistaId = null;
+    pintarPartida();
+    pintarHoja();
   }
 
   /* ================= HOJA DE COTIZACIÓN ================= */
@@ -218,10 +192,10 @@
     const cat = S.catalogo, emp = S.empresa;
     const T = MQ.calc.totales(quote, cat, emp);
 
-    $("brandName").textContent = emp.nombre || "Mi Mueblería";
+    $("brandName").textContent = emp.nombre || "Cotizador";
     $("sheetCompany").innerHTML =
       (emp.logo ? `<img class="sheet-logo" src="${esc(emp.logo)}" alt="${esc(emp.nombre || "Logo")}">` : "") +
-      `<div class="sc-n">${esc(emp.nombre || "Mi Mueblería")}</div>` +
+      `<div class="sc-n">${esc(emp.nombre || "Mi taller")}</div>` +
       `<div class="sc-d">${esc([emp.rut && "RUT " + emp.rut, emp.telefono, emp.email].filter(Boolean).join(" · "))}</div>`;
     $("quoteNo").textContent = "N° " + (quote.numero || S.nextNumero());
     $("quoteDate").textContent = fechaCorta(quote.creado);
@@ -231,23 +205,23 @@
       ? `<strong>${esc(c.nombre)}</strong>${c.obra ? " · " + esc(c.obra) : ""}`
       : `<span class="muted">Sin datos del cliente</span>`;
 
-    $("items").innerHTML = T.lineas.length ? T.lineas.map((l, i) => {
-      const m = l.mueble, d = descripcion(m);
-      return `<li class="item${editando === m.id ? " editing" : ""}">
+    $("partidas").innerHTML = T.partidas.length ? T.partidas.map((x, i) => {
+      const p = x.partida;
+      const dib = MQ.croquis.conDibujo(p.croquis).length;
+      return `<li class="item${p.id === partidaId ? " editing" : ""}" data-p="${esc(p.id)}">
         <div class="it-n">
-          <div class="it-t">${esc(m.nombre || MQ.tipo(m.tipo).nombre)}</div>
-          <div class="it-d mono">${esc(medidas(m))}</div>
-          ${d ? `<div class="it-d">${esc(d)}</div>` : ""}
+          <div class="it-t">${esc(p.nombre || "Partida " + (i + 1))}</div>
+          ${p.descripcion ? `<div class="it-d">${esc(p.descripcion)}</div>` : ""}
+          <div class="it-d mono">${x.calc.lineas.length} materiales${dib ? " · " + dib + (dib === 1 ? " vista" : " vistas") : ""}</div>
         </div>
-        <div class="it-q mono">${m.cantidad > 1 ? m.cantidad + " × " + MQ.clp(l.calc.unitario) : ""}</div>
-        <div class="it-p mono">${MQ.clp(l.calc.total)}</div>
+        <div class="it-q mono">${x.calc.cantidad > 1 ? x.calc.cantidad + " × " + MQ.clp(x.calc.unitario) : ""}</div>
+        <div class="it-p mono">${MQ.clp(x.calc.total)}</div>
         <div class="it-a">
-          <button class="icon" data-act="edit" data-i="${i}" title="Editar" aria-label="Editar">✎</button>
-          <button class="icon" data-act="dup" data-i="${i}" title="Duplicar" aria-label="Duplicar">⧉</button>
-          <button class="icon" data-act="del" data-i="${i}" title="Quitar" aria-label="Quitar">✕</button>
+          <button class="icon" data-act="dup" data-p="${esc(p.id)}" title="Duplicar" aria-label="Duplicar">⧉</button>
+          <button class="icon" data-act="del" data-p="${esc(p.id)}" title="Quitar" aria-label="Quitar">✕</button>
         </div>
       </li>`;
-    }).join("") : `<li class="empty">Todavía no hay muebles. Configura uno a la izquierda y agrégalo.</li>`;
+    }).join("") : `<li class="empty">Todavía no hay partidas.</li>`;
 
     const fila = (k, v, cls) => `<div class="${cls || ""}"><span>${esc(k)}</span><b class="mono">${esc(v)}</b></div>`;
     $("totales").innerHTML =
@@ -256,11 +230,7 @@
       fila("IVA " + T.ivaPct + "%", MQ.clp(T.iva)) +
       fila("Total", MQ.clp(T.total), "grand");
 
-    $("mbCount").textContent = quote.muebles.length + (quote.muebles.length === 1 ? " mueble" : " muebles");
-    $("mbTotal").textContent = MQ.clp(T.total);
-    $("mobileBar").hidden = quote.muebles.length === 0;
-
-    S.saveDraft(quote);
+    guardarBorrador();
   }
 
   function leerHoja() {
@@ -274,14 +244,6 @@
     quote.estado = $("qEstado").value;
   }
 
-  /* una cotización guardada con una versión anterior no trae croquis */
-  function volcarCroquis() {
-    if (!quote.croquis) quote.croquis = MQ.croquis.nuevo();
-    if (!quote.croquis.objetos) quote.croquis.objetos = [];
-    $("crEscala").value = quote.croquis.escala;
-    if (croquis) croquis.pintar();
-  }
-
   function volcarHoja() {
     const c = quote.cliente || {};
     $("cNombre").value = c.nombre || ""; $("cRut").value = c.rut || "";
@@ -290,60 +252,6 @@
     $("qDescuento").value = quote.descuento || 0;
     $("qNotas").value = quote.notas || "";
     $("qEstado").value = quote.estado || "borrador";
-    volcarCroquis();
-  }
-
-  /* ================= DESPIECE ================= */
-  function pintarDespiece() {
-    const cat = S.catalogo;
-    const nom = (id) => (cat.tableros.find((t) => t.id === id) || {}).nombre || id;
-    if (!quote.muebles.length) {
-      $("despieceBody").innerHTML = `<p class="hint">Agrega al menos un mueble para ver el despiece.</p>`;
-      return;
-    }
-    const bloques = quote.muebles.map((m, i) => {
-      const c = MQ.calc.costear(m, cat);
-      const n = Math.max(1, m.cantidad || 1);
-      const filas = c.piezas.map((p) => `<tr>
-        <td>${esc(p.nombre)}</td>
-        <td class="mono num">${p.cant * n}</td>
-        <td class="mono num">${p.largo}</td>
-        <td class="mono num">${p.ancho}</td>
-        <td class="small">${esc(nom(p.mat))}</td>
-        <td class="small">${p.canto ? esc([p.cl ? p.cl + "× largo" : "", p.ca ? p.ca + "× ancho" : ""].filter(Boolean).join(" + ")) : "—"}</td>
-      </tr>`).join("");
-      const lin = c.lineales.map((l) => `<tr>
-        <td>${esc(l.nombre)}</td>
-        <td class="mono num">${l.cant * n}</td>
-        <td class="mono num">${l.largo}</td>
-        <td class="small">${l.clase === "perfil" ? "Perfil de fierro" : "Madera dimensionada"}</td>
-        <td class="mono num">${(l.metros * n).toFixed(2).replace(".", ",")} m</td>
-      </tr>`).join("");
-
-      return `<h3 class="desp-h">${i + 1}. ${esc(m.nombre || MQ.tipo(m.tipo).nombre)}
-          <span class="mono">${esc(medidas(m))}${n > 1 ? " · " + n + " un." : ""}</span></h3>
-        ${filas ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>
-          <th>Pieza</th><th class="num">Cant.</th><th class="num">Largo</th><th class="num">Ancho</th><th>Tablero</th><th>Cantos</th>
-        </tr></thead><tbody>${filas}</tbody></table></div>` : ""}
-        ${lin ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>
-          <th>Madera y perfiles</th><th class="num">Piezas</th><th class="num">Largo</th><th>Tipo</th><th class="num">Total</th>
-        </tr></thead><tbody>${lin}</tbody></table></div>` : ""}
-        ${c.cubiertaDeMadera ? `<p class="hint">La cubierta se arma con estas piezas: no lleva tablero.</p>` : ""}`;
-    }).join("");
-
-    const L = MQ.calc.listaCompra(quote, cat);
-    const compra = [
-      ...L.tableros.map((t) => [t.nombre, t.planchasEnteras + (t.planchasEnteras === 1 ? " plancha" : " planchas"), t.m2.toFixed(2) + " m²"]),
-      ...L.maderas.map((l) => [l.nombre, Math.ceil(l.metros) + " m", l.piezas + (l.piezas === 1 ? " pieza" : " piezas")]),
-      ...L.perfiles.map((l) => [l.nombre, Math.ceil(l.metros) + " m", l.piezas + (l.piezas === 1 ? " pieza" : " piezas")]),
-      ...L.cantos.map((c) => [c.nombre, Math.ceil(c.ml) + " m", ""]),
-      ...L.herrajes.map((h) => [h.nombre, Math.ceil(h.cant) + " " + h.unidad, ""])
-    ].map(([a, b, d]) => `<tr><td>${esc(a)}</td><td class="mono num">${esc(b)}</td><td class="small num">${esc(d)}</td></tr>`).join("");
-
-    $("despieceBody").innerHTML = bloques +
-      `<h3 class="desp-h">Lista de compra <span class="mono">con ${cat.params.desperdicio}% de desperdicio</span></h3>
-       <div class="tbl-wrap"><table class="tbl"><tbody>${compra}</tbody></table></div>
-       <p class="hint">Las planchas se calculan por superficie más desperdicio y se redondean hacia arriba: no es un plano de optimización de corte.</p>`;
   }
 
   /* ================= RESUMEN DE TEXTO ================= */
@@ -351,16 +259,15 @@
     const cat = S.catalogo, emp = S.empresa;
     const T = MQ.calc.totales(quote, cat, emp);
     const l = [];
-    l.push(emp.nombre || "Mueblería");
+    l.push(emp.nombre || "Taller");
     l.push("Cotización N° " + (quote.numero || S.nextNumero()) + " · " + fechaCorta(quote.creado));
     if (quote.cliente.nombre) l.push("Cliente: " + quote.cliente.nombre);
     if (quote.cliente.obra) l.push("Obra: " + quote.cliente.obra);
     l.push("");
-    T.lineas.forEach((x, i) => {
-      const m = x.mueble, d = descripcion(m);
-      l.push((i + 1) + ". " + (m.nombre || MQ.tipo(m.tipo).nombre) + " — " + medidas(m));
-      if (d) l.push("   " + d);
-      l.push("   " + (m.cantidad > 1 ? m.cantidad + " × " + MQ.clp(x.calc.unitario) + " = " : "") + MQ.clp(x.calc.total));
+    T.partidas.forEach((x, i) => {
+      l.push((i + 1) + ". " + (x.partida.nombre || "Partida"));
+      if (x.partida.descripcion) l.push("   " + x.partida.descripcion);
+      l.push("   " + (x.calc.cantidad > 1 ? x.calc.cantidad + " × " + MQ.clp(x.calc.unitario) + " = " : "") + MQ.clp(x.calc.total));
     });
     l.push("");
     l.push("Neto: " + MQ.clp(T.neto));
@@ -372,17 +279,14 @@
     return l.join("\n");
   }
 
-  /* ---------- WhatsApp ----------
-     Normaliza un teléfono chileno al formato internacional que pide wa.me.
-     Devuelve "" si no parece un número utilizable, y en ese caso WhatsApp
-     abre sin destinatario para que elijas el contacto a mano. */
+  /* Normaliza un teléfono chileno al formato internacional que pide wa.me. */
   function telefonoWhats(tel) {
     const d = String(tel || "").replace(/\D/g, "");
     if (!d) return "";
     if (d.startsWith("56")) return d.length >= 11 ? d : "";
-    if (d.length === 9 && d.startsWith("9")) return "56" + d;   // celular
-    if (d.length === 8) return "569" + d;                       // sin el 9
-    if (d.length === 9) return "56" + d;                        // fijo con código
+    if (d.length === 9 && d.startsWith("9")) return "56" + d;
+    if (d.length === 8) return "569" + d;
+    if (d.length === 9) return "56" + d;
     return d.length >= 10 ? d : "";
   }
 
@@ -390,22 +294,21 @@
   function pintarHistorial() {
     const q = ($("histSearch").value || "").toLowerCase().trim();
     const f = $("histFilter").value;
-    const cat = S.catalogo, emp = S.empresa;
     const lista = S.quotes.filter((x) => {
       if (f && x.estado !== f) return false;
       if (!q) return true;
       const c = x.cliente || {};
-      return [c.nombre, c.obra, c.rut, "n° " + x.numero, String(x.numero)]
-        .filter(Boolean).some((s) => String(s).toLowerCase().includes(q));
+      return [c.nombre, c.obra, c.rut, String(x.numero)].filter(Boolean).some((s) => String(s).toLowerCase().includes(q));
     });
     $("histList").innerHTML = lista.length ? lista.map((x) => {
-      const T = MQ.calc.totales(x, cat, emp);
+      const T = MQ.calc.totales(x, S.catalogo, S.empresa);
       const c = x.cliente || {};
+      const n = (x.partidas || []).length;
       return `<article class="hcard">
         <div class="hc-no mono">N° ${x.numero || "—"}</div>
         <div class="hc-m">
           <div class="hc-t">${esc(c.nombre || "Sin cliente")}</div>
-          <div class="hc-d">${esc([c.obra, (x.muebles || []).length + ((x.muebles || []).length === 1 ? " mueble" : " muebles"), fechaCorta(x.actualizado || x.creado)].filter(Boolean).join(" · "))}</div>
+          <div class="hc-d">${esc([c.obra, n + (n === 1 ? " partida" : " partidas"), fechaCorta(x.actualizado || x.creado)].filter(Boolean).join(" · "))}</div>
         </div>
         <div class="hc-p mono">${MQ.clp(T.total)}</div>
         <span class="pill" data-estado="${esc(x.estado || "borrador")}">${esc(ESTADOS[x.estado] || "Borrador")}</span>
@@ -418,109 +321,62 @@
     }).join("") : `<p class="hint">No hay cotizaciones que coincidan.</p>`;
   }
 
-  /* ================= MATERIALES ================= */
+  /* ================= CATÁLOGO ================= */
   function pintarCatalogo() {
     const cat = S.catalogo;
-    const inp = (val, campo, idx, extra) =>
-      `<input class="input cell" value="${esc(val)}" data-campo="${campo}" data-i="${idx}" ${extra || ""}>`;
+    const inp = (val, campo, i, extra) =>
+      `<input class="input cell" value="${esc(val)}" data-campo="${campo}" data-i="${i}" ${extra || ""}>`;
 
-    $("tblTableros").querySelector("tbody").innerHTML = cat.tableros.map((t, i) => `<tr>
-      <td>${inp(t.nombre, "nombre", i)}</td>
-      <td class="w70">${inp(t.espesor, "espesor", i, 'inputmode="numeric"')}</td>
-      <td class="w80">${inp(t.largo, "largo", i, 'inputmode="numeric"')}</td>
-      <td class="w80">${inp(t.ancho, "ancho", i, 'inputmode="numeric"')}</td>
-      <td class="w110">${inp(t.precio, "precio", i, 'inputmode="numeric"')}</td>
-      <td class="mono small num">${MQ.clp(MQ.calc.precioM2(cat, t.id))}</td>
-      <td class="w40"><input type="checkbox" class="cell-check" data-macizo="${i}"${t.macizo ? " checked" : ""} aria-label="Canto a la vista, sin tapacanto"></td>
-      <td class="w40"><button class="icon" data-del-tab="${i}" title="Quitar tablero" aria-label="Quitar tablero">✕</button></td>
-    </tr>`).join("");
-
-    $("tblEscuadrias").querySelector("tbody").innerHTML = (cat.escuadrias || []).map((e, i) => `<tr>
-      <td>${inp(e.nombre, "nombre", i)}</td>
-      <td class="w70"><div class="unit" data-unit="&quot;">${inp(e.esp, "esp", i, 'inputmode="decimal"')}</div></td>
-      <td class="w70"><div class="unit" data-unit="&quot;">${inp(e.anc, "anc", i, 'inputmode="decimal"')}</div></td>
-      <td class="w110">${inp(e.precio, "precio", i, 'inputmode="numeric"')}</td>
-      <td class="w40"><button class="icon" data-del-esc="${i}" title="Quitar escuadría" aria-label="Quitar escuadría">✕</button></td>
-    </tr>`).join("");
-
-    $("tblPerfiles").querySelector("tbody").innerHTML = (cat.perfiles || []).map((p, i) => `<tr>
-      <td>${inp(p.nombre, "nombre", i)}</td>
-      <td class="w110">${inp(p.precio, "precio", i, 'inputmode="numeric"')}</td>
-      <td class="w40"><button class="icon" data-del-per="${i}" title="Quitar perfil" aria-label="Quitar perfil">✕</button></td>
-    </tr>`).join("");
-
-    $("tblCantos").querySelector("tbody").innerHTML = cat.cantos.map((c, i) => `<tr>
-      <td>${inp(c.nombre, "nombre", i)}</td>
-      <td class="w110">${inp(c.precio, "precio", i, 'inputmode="numeric"')}</td>
-    </tr>`).join("");
-
-    $("tblHerrajes").querySelector("tbody").innerHTML = Object.keys(cat.herrajes).map((k) => {
-      const h = cat.herrajes[k];
-      return `<tr><td>${esc(h.nombre)}</td><td class="small">${esc(h.unidad)}</td>
-        <td class="w110"><input class="input cell" value="${esc(h.precio)}" data-herraje="${esc(k)}" inputmode="numeric"></td></tr>`;
+    $("tblItems").querySelector("tbody").innerHTML = (cat.items || []).map((it, i) => {
+      const esMadera = MQ.categoria(it.cat).escuadria;
+      return `<tr>
+        <td class="w140"><select class="select cell" data-campo="cat" data-i="${i}">${MQ.CATEGORIAS.map((c) =>
+          `<option value="${c.id}"${c.id === it.cat ? " selected" : ""}>${esc(c.nombre)}</option>`).join("")}</select></td>
+        <td>${inp(it.nombre, "nombre", i)}</td>
+        <td class="w70">${esMadera ? inp(it.esp == null ? "" : it.esp, "esp", i, 'inputmode="decimal"') : ""}</td>
+        <td class="w70">${esMadera ? inp(it.anc == null ? "" : it.anc, "anc", i, 'inputmode="decimal"') : ""}</td>
+        <td class="w110"><select class="select cell" data-campo="unidad" data-i="${i}">${Object.keys(MQ.UNIDADES).map((u) =>
+          `<option value="${u}"${u === it.unidad ? " selected" : ""}>${esc(MQ.UNIDADES[u].largo)}</option>`).join("")}</select></td>
+        <td class="w110">${inp(it.precio, "precio", i, 'inputmode="numeric"')}</td>
+        <td class="w40"><button class="icon" data-del-item="${i}" title="Quitar" aria-label="Quitar ítem">✕</button></td>
+      </tr>`;
     }).join("");
 
-    $("tblMano").querySelector("tbody").innerHTML = Object.keys(cat.mano).map((k) => {
-      const h = cat.mano[k];
-      return `<tr><td>${esc(h.nombre)}</td><td class="small">${esc(h.unidad)}</td>
-        <td class="w110"><input class="input cell" value="${esc(h.precio)}" data-mano="${esc(k)}" inputmode="numeric"></td></tr>`;
-    }).join("");
-
-    $("pDesperdicio").value = cat.params.desperdicio;
     $("pGastos").value = cat.params.gastos;
     $("pMargen").value = cat.params.margen;
     $("pRedondeo").value = cat.params.redondeo;
+    pintarPlantillas();
   }
 
   function leerCatalogo() {
     const cat = MQ.clone(S.catalogo);
-    const tbody = (id) => $(id).querySelectorAll("tbody .cell");
-    tbody("tblTableros").forEach((el) => {
-      const i = +el.dataset.i, campo = el.dataset.campo;
-      if (!cat.tableros[i]) return;
-      cat.tableros[i][campo] = campo === "nombre" ? el.value.trim() : Math.max(0, MQ.num(el.value, 0));
-    });
-    tbody("tblCantos").forEach((el) => {
-      const i = +el.dataset.i, campo = el.dataset.campo;
-      if (!cat.cantos[i]) return;
-      cat.cantos[i][campo] = campo === "nombre" ? el.value.trim() : Math.max(0, MQ.num(el.value, 0));
-    });
-    tbody("tblEscuadrias").forEach((el) => {
-      const i = +el.dataset.i, campo = el.dataset.campo;
-      if (!cat.escuadrias[i]) return;
-      cat.escuadrias[i][campo] = campo === "nombre" ? el.value.trim() : Math.max(0, MQ.num(el.value, 0));
-    });
-    tbody("tblPerfiles").forEach((el) => {
-      const i = +el.dataset.i, campo = el.dataset.campo;
-      if (!cat.perfiles[i]) return;
-      cat.perfiles[i][campo] = campo === "nombre" ? el.value.trim() : Math.max(0, MQ.num(el.value, 0));
-    });
-    $("tblTableros").querySelectorAll("[data-macizo]").forEach((el) => {
-      const t = cat.tableros[+el.dataset.macizo];
-      if (t) t.macizo = el.checked;
-    });
-    $("tblHerrajes").querySelectorAll("[data-herraje]").forEach((el) => {
-      cat.herrajes[el.dataset.herraje].precio = Math.max(0, MQ.num(el.value, 0));
-    });
-    $("tblMano").querySelectorAll("[data-mano]").forEach((el) => {
-      cat.mano[el.dataset.mano].precio = Math.max(0, MQ.num(el.value, 0));
+    $("tblItems").querySelectorAll("tbody .cell").forEach((el) => {
+      const it = cat.items[+el.dataset.i];
+      if (!it) return;
+      const campo = el.dataset.campo;
+      if (campo === "nombre") it.nombre = el.value.trim();
+      else if (campo === "cat" || campo === "unidad") it[campo] = el.value;
+      else it[campo] = Math.max(0, MQ.num(el.value, 0));
     });
     cat.params = {
-      desperdicio: Math.max(0, MQ.num($("pDesperdicio").value, 0)),
       gastos: Math.max(0, MQ.num($("pGastos").value, 0)),
       margen: Math.max(0, MQ.num($("pMargen").value, 0)),
       redondeo: Math.max(1, MQ.num($("pRedondeo").value, 1))
     };
-    cat.tableros = cat.tableros.filter((t) => t.nombre);
-    /* una escuadría se identifica por sus pulgadas, el nombre es opcional */
-    cat.escuadrias = cat.escuadrias.filter((e) => e.anc > 0 && e.esp > 0);
-    cat.perfiles = cat.perfiles.filter((p) => p.nombre);
+    cat.items = cat.items.filter((it) => it.nombre);
     return cat;
   }
 
+  function pintarPlantillas() {
+    $("listaPlantillas").innerHTML = S.plantillas.length ? S.plantillas.map((t) => `
+      <div class="plt">
+        <span class="plt-n">${esc(t.nombre || "Sin nombre")}</span>
+        <span class="plt-d">${(t.lineas || []).length} materiales · ${MQ.croquis.conDibujo(t.croquis).length} vistas</span>
+        <button class="btn btn-ghost btn-sm" data-del-plt="${esc(t.id)}">Quitar</button>
+      </div>`).join("") : `<p class="hint">Todavía no hay plantillas. Se guardan desde una partida.</p>`;
+  }
+
   /* ================= EMPRESA ================= */
-  /* El logo se guarda al elegirlo, sin esperar al botón del formulario:
-     así el recuadro de arriba muestra siempre lo que quedó guardado. */
   function pintarLogo() {
     const src = S.empresa.logo;
     $("eLogoPrev").innerHTML = src ? `<img src="${esc(src)}" alt="Logo de la empresa">` : "";
@@ -540,95 +396,172 @@
   function verVista(v) {
     document.querySelectorAll(".view").forEach((el) => { el.hidden = el.id !== "view-" + v; });
     document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === v)));
-    if (v === "croquis") volcarCroquis();
     if (v === "historial") pintarHistorial();
     if (v === "materiales") pintarCatalogo();
     if (v === "empresa") pintarEmpresa();
-    $("mobileBar").hidden = v !== "cotizar" || !quote.muebles.length;
+    if (v === "cotizar" && croquis && partida()) croquis.pintar();
     window.scrollTo({ top: 0 });
   }
 
   /* ================= EVENTOS ================= */
   function conectar() {
     document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => verVista(b.dataset.view)));
+    document.querySelectorAll(".subtab").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll(".subtab").forEach((x) => x.classList.toggle("on", x === b));
+      $("subCroquis").hidden = b.dataset.sub !== "croquis";
+      $("subMateriales").hidden = b.dataset.sub !== "materiales";
+      if (b.dataset.sub === "croquis" && croquis && partida()) croquis.pintar();
+    }));
 
-    $("tipos").addEventListener("click", (ev) => {
-      const b = ev.target.closest("[data-tipo]");
-      if (b) elegirTipo(b.dataset.tipo);
+    /* ---- datos de la partida ---- */
+    ["pNombre", "pDescripcion", "pCantidad"].forEach((id) => $(id).addEventListener("input", () => {
+      const p = partida();
+      if (!p) return;
+      p.nombre = $("pNombre").value.trim();
+      p.descripcion = $("pDescripcion").value.trim();
+      p.cantidad = Math.min(99, Math.max(1, Math.round(MQ.num($("pCantidad").value, 1))));
+      $("partidaTitulo").textContent = p.nombre || "Partida sin nombre";
+      pintarHoja();
+    }));
+
+    $("addPartida").addEventListener("click", () => {
+      const p = MQ.nuevaPartida();
+      quote.partidas.push(p);
+      seleccionarPartida(p.id);
+      $("pNombre").focus();
     });
 
-    ["fNombre", "fAncho", "fAlto", "fProf", "fPuertas", "fCajones", "fEntrepanos",
-     "fCajonCol", "fTrasera", "fZocalo", "fCubierta", "fBarra", "fInstalar", "fCantidad",
-     "fMatCuerpo", "fMatFrente", "fMatTrasera", "fMatCajon", "fMatCubierta"].forEach((id) => {
-      $(id).addEventListener("input", refrescarConfig);
-      $(id).addEventListener("change", refrescarConfig);
+    $("pBorrar").addEventListener("click", () => {
+      const p = partida();
+      if (!p || !confirm("¿Quitar esta partida de la cotización?")) return;
+      quote.partidas = quote.partidas.filter((x) => x.id !== p.id);
+      seleccionarPartida(quote.partidas.length ? quote.partidas[0].id : null);
     });
 
-    /* madera y perfiles del mueble */
-    document.querySelectorAll("[data-add-lineal]").forEach((b) =>
-      b.addEventListener("click", () => agregarLineal(b.dataset.addLineal)));
-    $("lineales").addEventListener("input", refrescarConfig);
-    $("lineales").addEventListener("change", refrescarConfig);
-    $("lineales").addEventListener("click", (ev) => {
-      const b = ev.target.closest("[data-del-lineal]");
-      if (!b) return;
-      leerLineales();
-      actual.lineales.splice(+b.dataset.delLineal, 1);
-      pintarLineales(); pintarConfigurador();
+    $("pPlantilla").addEventListener("click", () => {
+      const p = partida();
+      if (!p) return;
+      if (!p.nombre) return MQ.toast("Ponle un nombre a la partida antes de guardarla.");
+      S.savePlantilla(p);
+      MQ.toast("Plantilla guardada: " + p.nombre);
     });
 
-    $("qtyMinus").addEventListener("click", () => { $("fCantidad").value = Math.max(1, MQ.num($("fCantidad").value, 1) - 1); refrescarConfig(); });
-    $("qtyPlus").addEventListener("click", () => { $("fCantidad").value = Math.min(99, MQ.num($("fCantidad").value, 1) + 1); refrescarConfig(); });
-
-    $("addItem").addEventListener("click", () => {
-      leerFormulario();
-      const m = MQ.clone(actual);
-      if (editando) {
-        const i = quote.muebles.findIndex((x) => x.id === editando);
-        if (i >= 0) quote.muebles[i] = m;
-        editando = null;
-        MQ.toast("Mueble actualizado");
-      } else {
-        m.id = MQ.uid();
-        quote.muebles.push(m);
-        MQ.toast("Mueble agregado a la cotización");
-      }
-      actual = MQ.nuevoMueble(m.tipo);
-      pintarTipos(); volcarFormulario(); pintarConfigurador(); pintarHoja();
-    });
-
-    $("cancelEdit").addEventListener("click", () => {
-      editando = null;
-      actual = MQ.nuevoMueble(actual.tipo);
-      pintarTipos(); volcarFormulario(); pintarConfigurador(); pintarHoja();
-    });
-
-    $("items").addEventListener("click", (ev) => {
+    $("partidas").addEventListener("click", (ev) => {
       const b = ev.target.closest("[data-act]");
-      if (!b) return;
-      const i = +b.dataset.i, m = quote.muebles[i];
-      if (!m) return;
-      if (b.dataset.act === "del") {
-        quote.muebles.splice(i, 1);
-        if (editando === m.id) editando = null;
-      } else if (b.dataset.act === "dup") {
-        const copia = MQ.clone(m); copia.id = MQ.uid();
-        quote.muebles.splice(i + 1, 0, copia);
-      } else {
-        actual = MQ.clone(m);
-        editando = m.id;
-        pintarTipos(); volcarFormulario(); pintarConfigurador();
-        document.querySelector(".panel").scrollIntoView({ behavior: "smooth", block: "start" });
+      if (b) {
+        const p = quote.partidas.find((x) => x.id === b.dataset.p);
+        if (!p) return;
+        if (b.dataset.act === "dup") {
+          const copia = MQ.clone(p);
+          copia.id = MQ.uid();
+          copia.croquis.vistas.forEach((v) => { v.id = MQ.uid(); v.objetos.forEach((o) => { o.id = MQ.uid(); }); });
+          copia.lineas.forEach((l) => { l.id = MQ.uid(); });
+          quote.partidas.splice(quote.partidas.indexOf(p) + 1, 0, copia);
+          seleccionarPartida(copia.id);
+        } else {
+          if (!confirm("¿Quitar esta partida?")) return;
+          quote.partidas = quote.partidas.filter((x) => x.id !== p.id);
+          if (partidaId === p.id) seleccionarPartida(quote.partidas.length ? quote.partidas[0].id : null);
+          else pintarHoja();
+        }
+        return;
       }
-      pintarConfigurador(); pintarHoja();
+      const li = ev.target.closest("[data-p]");
+      if (li) seleccionarPartida(li.dataset.p);
     });
 
+    /* ---- vistas del croquis ---- */
+    $("crVistas").addEventListener("click", (ev) => {
+      const x = ev.target.closest("[data-del-vista]");
+      const p = partida();
+      if (x) {
+        ev.stopPropagation();
+        if (p.croquis.vistas.length <= 1) return;
+        if (!confirm("¿Quitar esta vista y lo que tenga dibujado?")) return;
+        p.croquis.vistas = p.croquis.vistas.filter((v) => v.id !== x.dataset.delVista);
+        vistaId = p.croquis.vistas[0].id;
+        pintarVistas(); croquis.reiniciar(); pintarLineas(); pintarHoja();
+        return;
+      }
+      const b = ev.target.closest("[data-vista]");
+      if (!b) return;
+      vistaId = b.dataset.vista;
+      pintarVistas(); croquis.reiniciar(); pintarBarraMaterial();
+    });
+
+    $("crAddVista").addEventListener("click", () => {
+      const p = partida();
+      const usadas = p.croquis.vistas.map((v) => v.nombre);
+      const sugerida = ["Frente", "Planta", "Lateral", "Corte", "Detalle"].find((n) => usadas.indexOf(n) < 0) || "Vista";
+      const nombre = (prompt("Nombre de la vista:", sugerida) || "").trim();
+      if (!nombre) return;
+      const v = MQ.nuevaVista(nombre);
+      p.croquis.vistas.push(v);
+      vistaId = v.id;
+      pintarVistas(); croquis.reiniciar(); guardarBorrador(); pintarHoja();
+    });
+
+    /* ---- herramientas ---- */
+    document.querySelectorAll(".tool").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll(".tool").forEach((x) => x.classList.toggle("on", x === b));
+      croquis.herramienta(b.dataset.tool);
+      $("crAyuda").textContent = AYUDA[b.dataset.tool] || "";
+      pintarBarraMaterial();
+    }));
+    $("crEscala").addEventListener("input", () => {
+      partida().croquis.escala = Math.max(1, Math.round(MQ.num($("crEscala").value, 100)));
+      croquis.pintar(); pintarBarraMaterial(); pintarLineas(); pintarHoja();
+    });
+    $("crAcotar").addEventListener("change", () => {
+      partida().croquis.acotar = $("crAcotar").checked;
+      croquis.pintar(); guardarBorrador();
+    });
+    $("crSnap").addEventListener("change", () => croquis.ajuste($("crSnap").checked));
+    $("crUndo").addEventListener("click", () => { if (!croquis.deshacer()) MQ.toast("No hay nada que deshacer."); });
+    $("crDel").addEventListener("click", () => { if (!croquis.borrar()) MQ.toast("Selecciona algo del croquis para borrarlo."); });
+    $("crClear").addEventListener("click", () => {
+      if (MQ.croquis.vistaVacia(vista())) return MQ.toast("Esta vista ya está vacía.");
+      if (confirm("¿Borrar todo lo dibujado en esta vista?")) croquis.limpiar();
+    });
+    $("crMat").addEventListener("change", () => { croquis.asignar($("crMat").value, undefined); pintarBarraMaterial(); });
+    $("crPiezas").addEventListener("input", () => { croquis.asignar(undefined, $("crPiezas").value); pintarBarraMaterial(); });
+
+    document.addEventListener("keydown", (ev) => {
+      if ($("view-cotizar").hidden || $("subCroquis").hidden || !croquis) return;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;
+      if ((ev.key === "Enter" || ev.key === "Escape") && croquis.enCadena()) { ev.preventDefault(); croquis.cerrarCadena(); }
+      if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); croquis.borrar(); }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") { ev.preventDefault(); croquis.deshacer(); }
+    });
+
+    /* ---- materiales de la partida ---- */
+    $("addLinea").addEventListener("click", () => {
+      const p = partida();
+      const it = (S.catalogo.items || [])[0];
+      if (!it) return MQ.toast("El catálogo está vacío.");
+      p.lineas.push(MQ.nuevaLinea(it.id, it.unidad));
+      pintarLineas(); pintarHoja();
+    });
+    $("lineas").addEventListener("input", () => { leerLineas(); pintarLineas(); pintarHoja(); });
+    $("lineas").addEventListener("change", (ev) => {
+      leerLineas();
+      if (ev.target.dataset.campo === "itemId") pintarLineas();
+      pintarHoja();
+    });
+    $("lineas").addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-del-linea]");
+      if (!b) return;
+      leerLineas();
+      partida().lineas.splice(+b.dataset.delLinea, 1);
+      pintarLineas(); pintarHoja();
+    });
+
+    /* ---- hoja ---- */
     $("clientEdit").addEventListener("click", () => {
       const f = $("clientForm");
       f.hidden = !f.hidden;
       $("clientEdit").setAttribute("aria-expanded", String(!f.hidden));
     });
-
     ["cNombre", "cRut", "cTelefono", "cEmail", "cObra", "qDescuento", "qNotas", "qEstado"].forEach((id) => {
       $(id).addEventListener("input", () => { leerHoja(); pintarHoja(); });
       $(id).addEventListener("change", () => { leerHoja(); pintarHoja(); });
@@ -636,136 +569,106 @@
 
     $("btnSave").addEventListener("click", () => {
       leerHoja();
-      if (!quote.muebles.length) return MQ.toast("Agrega al menos un mueble antes de guardar.");
+      if (!quote.partidas.length) return MQ.toast("Agrega al menos una partida antes de guardar.");
       quote = S.saveQuote(quote);
       pintarHoja();
       MQ.toast("Cotización N° " + quote.numero + " guardada");
     });
 
     $("btnNew").addEventListener("click", () => {
-      if (quote.muebles.length && !confirm("¿Empezar una cotización nueva? Lo que no hayas guardado se pierde.")) return;
-      quote = nuevaCotizacion(); editando = null;
+      if (quote.partidas.length && !confirm("¿Empezar una cotización nueva? Lo que no hayas guardado se pierde.")) return;
+      quote = nuevaCotizacion();
+      seleccionarPartida(null);
       volcarHoja(); pintarHoja();
       MQ.toast("Cotización nueva");
     });
 
+    const conNumero = () => { if (!quote.numero) quote.numero = S.nextNumero(); };
     $("btnPdf").addEventListener("click", async () => {
       leerHoja();
-      if (!quote.muebles.length) return MQ.toast("Agrega al menos un mueble.");
-      if (!quote.numero) quote.numero = S.nextNumero();
+      if (!quote.partidas.length) return MQ.toast("Agrega al menos una partida.");
+      conNumero();
       try { await MQ.pdf.descargarCotizacion(quote, S.catalogo, S.empresa); }
       catch (e) { MQ.toast("No se pudo generar el PDF."); console.warn(e); }
     });
-
-    $("btnDespiece").addEventListener("click", () => { pintarDespiece(); $("despieceDlg").showModal(); });
-    $("despClose").addEventListener("click", () => $("despieceDlg").close());
-    $("despPdf").addEventListener("click", async () => {
-      if (!quote.muebles.length) return MQ.toast("Agrega al menos un mueble.");
-      if (!quote.numero) quote.numero = S.nextNumero();
-      try { await MQ.pdf.descargarDespiece(quote, S.catalogo, S.empresa); }
+    $("btnTaller").addEventListener("click", async () => {
+      if (!quote.partidas.length) return MQ.toast("Agrega al menos una partida.");
+      conNumero();
+      try { await MQ.pdf.descargarTaller(quote, S.catalogo, S.empresa); }
       catch (e) { MQ.toast("No se pudo generar el PDF."); console.warn(e); }
     });
 
     $("btnShare").addEventListener("click", async () => {
       leerHoja();
-      if (!quote.muebles.length) return MQ.toast("Agrega al menos un mueble.");
+      if (!quote.partidas.length) return MQ.toast("Agrega al menos una partida.");
       const txt = resumenTexto();
-      try {
-        await navigator.clipboard.writeText(txt);
-        MQ.toast("Resumen copiado al portapapeles");
-      } catch (e) {
-        $("shareText").value = txt;
-        $("shareDlg").showModal();
-      }
+      try { await navigator.clipboard.writeText(txt); MQ.toast("Resumen copiado al portapapeles"); }
+      catch (e) { $("shareText").value = txt; $("shareDlg").showModal(); }
     });
     $("shareClose").addEventListener("click", () => $("shareDlg").close());
 
-    /* Enviar por WhatsApp.
-       En el celular el PDF se entrega a la hoja de compartir del sistema y
-       llega adjunto. En el navegador de escritorio esa API no acepta
-       archivos, así que se descarga el PDF y se abre el chat con el texto
-       para adjuntarlo a mano. */
-    function abrirChat(texto) {
-      const tel = telefonoWhats(quote.cliente.telefono);
-      const t = encodeURIComponent(texto);
-      window.open(tel ? `https://wa.me/${tel}?text=${t}` : `https://wa.me/?text=${t}`, "_blank", "noopener");
-      return tel;
-    }
-
     $("btnWhats").addEventListener("click", async () => {
       leerHoja();
-      if (!quote.muebles.length) return MQ.toast("Agrega al menos un mueble.");
-      if (!quote.numero) quote.numero = S.nextNumero();
+      if (!quote.partidas.length) return MQ.toast("Agrega al menos una partida.");
+      conNumero();
       const texto = resumenTexto();
-
       let archivo = null;
       try {
         const pdf = await MQ.pdf.archivoCotizacion(quote, S.catalogo, S.empresa);
         archivo = { pdf, file: new File([pdf.blob], pdf.nombre, { type: "application/pdf" }) };
-      } catch (e) {
-        console.warn("pdf", e);
-      }
+      } catch (e) { console.warn("pdf", e); }
 
       if (archivo && navigator.canShare && navigator.canShare({ files: [archivo.file] })) {
         try {
           await navigator.share({ files: [archivo.file], text: texto });
           return MQ.toast("Elige WhatsApp para enviar la cotización con el PDF.");
         } catch (e) {
-          /* el usuario canceló: no hay nada que avisar ni que reintentar */
           if (e && e.name === "AbortError") return;
           console.warn("share", e);
         }
       }
-
       if (archivo) archivo.pdf.guardar();
-      const tel = abrirChat(texto);
-      MQ.toast(archivo
-        ? "PDF descargado. Adjúntalo en el chat con el clip."
-        : tel ? "WhatsApp abierto con el resumen." : "Elige el contacto en WhatsApp.");
+      const tel = telefonoWhats(quote.cliente.telefono);
+      const t = encodeURIComponent(texto);
+      window.open(tel ? `https://wa.me/${tel}?text=${t}` : `https://wa.me/?text=${t}`, "_blank", "noopener");
+      MQ.toast(archivo ? "PDF descargado. Adjúntalo en el chat con el clip." : "WhatsApp abierto con el resumen.");
     });
 
-    $("mbGo").addEventListener("click", () => document.querySelector(".quote-col").scrollIntoView({ behavior: "smooth" }));
-
-    /* croquis */
-    croquis = MQ.croquis.montar($("crLienzo"), () => quote.croquis, () => S.saveDraft(quote));
-    const AYUDA = {
-      sel: "Haz clic en un trazo para seleccionarlo y arrástralo para moverlo. Doble clic edita el texto de una cota o de un rótulo.",
-      linea: "Arrastra para dibujar la línea.",
-      rect: "Arrastra para dibujar el rectángulo.",
-      rombo: "Arrastra para dibujar el rombo dentro de ese recuadro.",
-      poli: "Un clic por cada punto. Doble clic termina la figura; vuelve al primer punto para cerrarla.",
-      texto: "Haz clic donde quieras poner el rótulo.",
-      cota: "Arrastra de un extremo al otro. La medida se calcula sola, y con doble clic puedes escribirla tú."
-    };
-    document.querySelectorAll(".tool").forEach((b) => b.addEventListener("click", () => {
-      document.querySelectorAll(".tool").forEach((x) => x.classList.toggle("on", x === b));
-      croquis.herramienta(b.dataset.tool);
-      $("crAyuda").textContent = AYUDA[b.dataset.tool] || "";
-    }));
-    $("crAyuda").textContent = AYUDA.sel;
-    $("crEdit").addEventListener("click", () => {
-      if (!croquis.editarSeleccion()) MQ.toast("Selecciona una cota o un rótulo para editar su texto.");
+    /* ---- plantillas ---- */
+    $("desdePlantilla").addEventListener("click", () => {
+      if (!S.plantillas.length) return MQ.toast("Todavía no has guardado ninguna plantilla.");
+      $("plantillaLista").innerHTML = S.plantillas.map((t) => `
+        <button type="button" class="plt plt-btn" data-usar="${esc(t.id)}">
+          <span class="plt-n">${esc(t.nombre || "Sin nombre")}</span>
+          <span class="plt-d">${(t.lineas || []).length} materiales · ${MQ.croquis.conDibujo(t.croquis).length} vistas</span>
+        </button>`).join("");
+      $("plantillaDlg").showModal();
     });
-    $("crEscala").addEventListener("input", () => {
-      quote.croquis.escala = Math.max(1, Math.round(MQ.num($("crEscala").value, 100)));
-      croquis.pintar(); S.saveDraft(quote);
+    $("plClose").addEventListener("click", () => $("plantillaDlg").close());
+    $("plantillaLista").addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-usar]");
+      if (!b) return;
+      const t = S.plantillas.find((x) => x.id === b.dataset.usar);
+      if (!t) return;
+      const p = MQ.clone(t);
+      p.id = MQ.uid();
+      delete p.guardado;
+      p.croquis.vistas.forEach((v) => { v.id = MQ.uid(); v.objetos.forEach((o) => { o.id = MQ.uid(); }); });
+      (p.lineas || []).forEach((l) => { l.id = MQ.uid(); });
+      quote.partidas.push(p);
+      $("plantillaDlg").close();
+      seleccionarPartida(p.id);
+      MQ.toast("Partida agregada desde la plantilla");
     });
-    $("crSnap").addEventListener("change", () => croquis.ajuste($("crSnap").checked));
-    $("crUndo").addEventListener("click", () => { if (!croquis.deshacer()) MQ.toast("No hay nada que deshacer."); });
-    $("crDel").addEventListener("click", () => { if (!croquis.borrar()) MQ.toast("Selecciona algo del croquis para borrarlo."); });
-    $("crClear").addEventListener("click", () => {
-      if (MQ.croquis.vacio(quote.croquis)) return MQ.toast("El croquis ya está vacío.");
-      if (confirm("¿Borrar todo el croquis? Se puede deshacer una vez.")) croquis.limpiar();
-    });
-    document.addEventListener("keydown", (ev) => {
-      if ($("view-croquis").hidden) return;
-      const enCampo = /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName);
-      if (!enCampo && (ev.key === "Enter" || ev.key === "Escape") && croquis.enCadena()) { ev.preventDefault(); croquis.cerrarCadena(); }
-      if (!enCampo && (ev.key === "Delete" || ev.key === "Backspace")) { ev.preventDefault(); croquis.borrar(); }
-      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") { ev.preventDefault(); croquis.deshacer(); }
+    $("listaPlantillas").addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-del-plt]");
+      if (!b) return;
+      if (!confirm("¿Quitar esta plantilla?")) return;
+      S.deletePlantilla(b.dataset.delPlt);
+      pintarPlantillas();
     });
 
-    /* historial */
+    /* ---- historial ---- */
     $("histSearch").addEventListener("input", pintarHistorial);
     $("histFilter").addEventListener("change", pintarHistorial);
     $("histList").addEventListener("click", (ev) => {
@@ -774,19 +677,22 @@
       const x = S.quotes.find((q) => q.id === b.dataset.id);
       if (!x) return;
       if (b.dataset.h === "open") {
-        quote = MQ.clone(x); editando = null;
-        volcarHoja(); pintarHoja(); verVista("cotizar");
+        quote = MQ.clone(x);
+        volcarHoja();
+        seleccionarPartida(quote.partidas.length ? quote.partidas[0].id : null);
+        verVista("cotizar");
         MQ.toast("Cotización N° " + quote.numero + " abierta");
       } else if (b.dataset.h === "dup") {
         quote = MQ.clone(x);
         quote.id = MQ.uid(); quote.numero = 0; quote.estado = "borrador";
         quote.creado = new Date().toISOString();
         delete quote.actualizado;
-        quote.muebles = (quote.muebles || []).map((m) => Object.assign(MQ.clone(m), { id: MQ.uid() }));
-        editando = null;
-        volcarHoja(); pintarHoja(); verVista("cotizar");
+        quote.partidas.forEach((p) => { p.id = MQ.uid(); });
+        volcarHoja();
+        seleccionarPartida(quote.partidas.length ? quote.partidas[0].id : null);
+        verVista("cotizar");
         MQ.toast("Copia lista para editar");
-      } else if (b.dataset.h === "del") {
+      } else {
         if (!confirm("¿Eliminar la cotización N° " + (x.numero || "—") + "?")) return;
         S.deleteQuote(x.id);
         pintarHistorial();
@@ -794,53 +700,21 @@
       }
     });
 
-    /* materiales */
-    $("tblTableros").addEventListener("input", () => {
-      /* el $/m² se recalcula al tipear */
+    /* ---- catálogo ---- */
+    $("tblItems").addEventListener("change", (ev) => {
       S.catalogo = leerCatalogo();
-      $("tblTableros").querySelectorAll("tbody tr").forEach((tr, i) => {
-        const t = S.catalogo.tableros[i];
-        const celda = tr.querySelector("td.mono");
-        if (t && celda) celda.textContent = MQ.clp(MQ.calc.precioM2(S.catalogo, t.id));
-      });
+      if (ev.target.dataset.campo === "cat") pintarCatalogo();
     });
-    $("tblTableros").addEventListener("click", (ev) => {
-      const b = ev.target.closest("[data-del-tab]");
+    $("tblItems").addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-del-item]");
       if (!b) return;
       const cat = leerCatalogo();
-      if (cat.tableros.length <= 1) return MQ.toast("Debe quedar al menos un tablero.");
-      cat.tableros.splice(+b.dataset.delTab, 1);
+      cat.items.splice(+b.dataset.delItem, 1);
       S.catalogo = cat; pintarCatalogo();
     });
-    $("addTablero").addEventListener("click", () => {
+    $("addItem").addEventListener("click", () => {
       const cat = leerCatalogo();
-      cat.tableros.push({ id: "t" + MQ.uid(), nombre: "Tablero nuevo", espesor: 18, largo: 2500, ancho: 1830, precio: 0 });
-      S.catalogo = cat; pintarCatalogo();
-    });
-
-    /* madera dimensionada y perfiles */
-    $("tblEscuadrias").addEventListener("click", (ev) => {
-      const b = ev.target.closest("[data-del-esc]");
-      if (!b) return;
-      const cat = leerCatalogo();
-      cat.escuadrias.splice(+b.dataset.delEsc, 1);
-      S.catalogo = cat; pintarCatalogo();
-    });
-    $("addEscuadria").addEventListener("click", () => {
-      const cat = leerCatalogo();
-      cat.escuadrias.push({ id: "e" + MQ.uid(), nombre: "", esp: 2, anc: 4, precio: 0 });
-      S.catalogo = cat; pintarCatalogo();
-    });
-    $("tblPerfiles").addEventListener("click", (ev) => {
-      const b = ev.target.closest("[data-del-per]");
-      if (!b) return;
-      const cat = leerCatalogo();
-      cat.perfiles.splice(+b.dataset.delPer, 1);
-      S.catalogo = cat; pintarCatalogo();
-    });
-    $("addPerfil").addEventListener("click", () => {
-      const cat = leerCatalogo();
-      cat.perfiles.push({ id: "p" + MQ.uid(), nombre: "Perfil nuevo", precio: 0 });
+      cat.items.push({ id: "i" + MQ.uid(), cat: "insumo", nombre: "Ítem nuevo", unidad: "un", precio: 0 });
       S.catalogo = cat; pintarCatalogo();
     });
     $("catSave").addEventListener("click", () => {
@@ -854,32 +728,26 @@
       MQ.toast("Valores de referencia restaurados");
     });
 
-    /* logo */
+    /* ---- logo y empresa ---- */
     $("eLogoFile").addEventListener("change", async (ev) => {
       const file = ev.target.files && ev.target.files[0];
-      ev.target.value = "";   // para poder volver a elegir el mismo archivo
+      ev.target.value = "";
       if (!file) return;
       try {
         const logo = await MQ.procesarLogo(file);
         S.saveEmpresa(Object.assign(MQ.clone(S.empresa), { logo }));
-        pintarLogo();
-        MQ.toast("Logo guardado");
-      } catch (e) {
-        MQ.toast((e && e.message) || "No se pudo usar esa imagen.");
-      }
+        pintarLogo(); MQ.toast("Logo guardado");
+      } catch (e) { MQ.toast((e && e.message) || "No se pudo usar esa imagen."); }
     });
     $("eLogoDel").addEventListener("click", () => {
-      if (!confirm("¿Quitar el logo de la empresa?")) return;
+      if (!confirm("¿Quitar el logo?")) return;
       S.saveEmpresa(Object.assign(MQ.clone(S.empresa), { logo: "" }));
-      pintarLogo();
-      MQ.toast("Logo quitado");
+      pintarLogo(); MQ.toast("Logo quitado");
     });
-
-    /* empresa */
     $("empresaForm").addEventListener("submit", (ev) => {
       ev.preventDefault();
       S.saveEmpresa({
-        logo: S.empresa.logo,   // el formulario no lo trae: se guarda aparte
+        logo: S.empresa.logo,
         nombre: $("eNombre").value.trim(), rut: $("eRut").value.trim(),
         telefono: $("eTelefono").value.trim(), email: $("eEmail").value.trim(),
         direccion: $("eDireccion").value.trim(),
@@ -891,27 +759,20 @@
     });
 
     S.on((kind) => {
-      if (kind === "catalogo") {
-        /* los materiales de un mueble pueden haber desaparecido del catálogo */
-        const ids = S.catalogo.tableros.map((t) => t.id);
-        Object.keys(actual.mat).forEach((k) => { if (ids.indexOf(actual.mat[k]) < 0) actual.mat[k] = ids[0]; });
-        pintarSelectsMaterial(); pintarConfigurador();
-      }
+      if (kind === "catalogo") { pintarBarraMaterial(); pintarLineas(); }
       if (kind === "catalogo" || kind === "empresa") pintarHoja();
+      if (kind === "plantillas") pintarPlantillas();
     });
   }
 
   /* ================= ARRANQUE ================= */
   function iniciar() {
     quote = S.loadDraft() || nuevaCotizacion();
-    if (!quote.muebles) quote.muebles = [];
-    if (!quote.cliente) quote.cliente = {};
-    actual = MQ.nuevoMueble("base");
-    pintarTipos(); volcarFormulario();
-    volcarHoja();
+    montarCroquis();
     conectar();
-    volcarCroquis();
-    pintarConfigurador(); pintarHoja();
+    volcarHoja();
+    $("crAyuda").textContent = AYUDA.sel;
+    seleccionarPartida(quote.partidas.length ? quote.partidas[0].id : null);
     verVista("cotizar");
   }
 

@@ -1,6 +1,10 @@
-/* Catálogo de referencia y tipos de mueble.
-   Los precios son netos en pesos chilenos y se pueden editar desde la app:
-   lo que se guarda en Materiales reemplaza estos valores por defecto. */
+/* Catálogo y estructuras base.
+
+   El catálogo es una sola lista de ítems. Cada ítem trae su unidad y su
+   precio, y eso es todo lo que el cálculo necesita saber: no hay fórmulas
+   por tipo de mueble, porque cada mueble se arma distinto.
+
+   Los precios son netos en pesos chilenos y se editan desde la app. */
 window.MQ = window.MQ || {};
 
 MQ.clone = (o) => JSON.parse(JSON.stringify(o));
@@ -8,74 +12,86 @@ MQ.uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 MQ.clp = (n) => "$" + Math.round(n || 0).toLocaleString("es-CL");
 MQ.num = (v, def) => { const n = parseFloat(String(v).replace(",", ".")); return isFinite(n) ? n : (def || 0); };
 MQ.redondear = (n, a) => (a > 0 ? Math.round(n / a) * a : Math.round(n));
+/* los decimales se muestran con coma, como se escriben acá */
+MQ.dec = (n, d) => (Math.round(n * Math.pow(10, d == null ? 2 : d)) / Math.pow(10, d == null ? 2 : d))
+  .toFixed(d == null ? 2 : d).replace(".", ",").replace(/,?0+$/, "");
 
-/* ---------- catálogo por defecto ---------- */
+/* ---------- unidades ----------
+   `lineal` marca las que se cargan como largo × número de piezas: en vez de
+   calcular los metros a mano, se anota el corte tal como se va a pedir. */
+MQ.UNIDADES = {
+  m: { nombre: "m", largo: "metro", lineal: true },
+  m2: { nombre: "m²", largo: "metro cuadrado" },
+  un: { nombre: "un.", largo: "unidad" },
+  plancha: { nombre: "plancha", largo: "plancha" },
+  hora: { nombre: "hora", largo: "hora" },
+  global: { nombre: "global", largo: "monto fijo" }
+};
+
+MQ.CATEGORIAS = [
+  { id: "madera", nombre: "Madera dimensionada", escuadria: true },
+  { id: "perfil", nombre: "Perfiles de fierro" },
+  { id: "tablero", nombre: "Tableros" },
+  { id: "herraje", nombre: "Herrajes" },
+  { id: "insumo", nombre: "Insumos y terminación" },
+  { id: "mano", nombre: "Mano de obra" }
+];
+MQ.categoria = (id) => MQ.CATEGORIAS.find((c) => c.id === id) || MQ.CATEGORIAS[0];
+
+/* ---------- catálogo por defecto ----------
+   Valores de referencia: hay que reemplazarlos por los propios.
+   En la madera, esp y anc van en pulgadas y arman el nombre: 2×4". */
 MQ.DEFAULT_CATALOGO = {
-  /* Tableros: precio por plancha entera y formato en mm.
-     El costo de cada pieza se prorratea por superficie. */
-  tableros: [
-    { id: "mel18b", nombre: "Melamina blanca 18 mm", espesor: 18, largo: 2500, ancho: 1830, precio: 38900 },
-    { id: "mel18m", nombre: "Melamina madera 18 mm", espesor: 18, largo: 2500, ancho: 1830, precio: 46900 },
-    { id: "mel15b", nombre: "Melamina blanca 15 mm", espesor: 15, largo: 2500, ancho: 1830, precio: 34900 },
-    { id: "mdf18", nombre: "MDF crudo 18 mm", espesor: 18, largo: 2500, ancho: 1830, precio: 32900 },
-    { id: "ter15", nombre: "Terciado 15 mm", espesor: 15, largo: 2440, ancho: 1220, precio: 28900 },
-    { id: "tras3", nombre: "Trasera melamina 3 mm", espesor: 3, largo: 2500, ancho: 1830, precio: 12900 },
-    /* Macizo: el canto queda a la vista, se lija y se termina, no se tapa */
-    { id: "mad50", nombre: "Madera maciza 50 mm", espesor: 50, largo: 2400, ancho: 650, precio: 135000, macizo: true },
-    { id: "mad30", nombre: "Madera maciza 30 mm", espesor: 30, largo: 2400, ancho: 650, precio: 89000, macizo: true }
+  items: [
+    { id: "m1x4", cat: "madera", nombre: "Pino seco cepillado", esp: 1, anc: 4, unidad: "m", precio: 1290 },
+    { id: "m1x6", cat: "madera", nombre: "Pino seco cepillado", esp: 1, anc: 6, unidad: "m", precio: 1890 },
+    { id: "m1x8", cat: "madera", nombre: "Pino seco cepillado", esp: 1, anc: 8, unidad: "m", precio: 2490 },
+    { id: "m2x2", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 2, unidad: "m", precio: 1490 },
+    { id: "m2x4", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 4, unidad: "m", precio: 2690 },
+    { id: "m2x6", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 6, unidad: "m", precio: 3890 },
+    { id: "m2x8", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 8, unidad: "m", precio: 5190 },
+
+    { id: "f30", cat: "perfil", nombre: "Tubo cuadrado 30×30×2 mm", unidad: "m", precio: 2690 },
+    { id: "f40", cat: "perfil", nombre: "Tubo cuadrado 40×40×2 mm", unidad: "m", precio: 3490 },
+    { id: "f5020", cat: "perfil", nombre: "Tubo rectangular 50×20×2 mm", unidad: "m", precio: 3190 },
+    { id: "fang", cat: "perfil", nombre: "Ángulo 40×40×3 mm", unidad: "m", precio: 3890 },
+    { id: "fplat", cat: "perfil", nombre: "Pletina 38×3 mm", unidad: "m", precio: 2290 },
+
+    { id: "mel18b", cat: "tablero", nombre: "Melamina blanca 18 mm", unidad: "plancha", precio: 38900 },
+    { id: "mel18m", cat: "tablero", nombre: "Melamina madera 18 mm", unidad: "plancha", precio: 46900 },
+    { id: "mel15b", cat: "tablero", nombre: "Melamina blanca 15 mm", unidad: "plancha", precio: 34900 },
+    { id: "mdf18", cat: "tablero", nombre: "MDF crudo 18 mm", unidad: "plancha", precio: 32900 },
+    { id: "ter15", cat: "tablero", nombre: "Terciado 15 mm", unidad: "plancha", precio: 28900 },
+    { id: "tras3", cat: "tablero", nombre: "Trasera melamina 3 mm", unidad: "plancha", precio: 12900 },
+
+    { id: "bisagra", cat: "herraje", nombre: "Bisagra con amortiguación", unidad: "un", precio: 2690 },
+    { id: "corredera", cat: "herraje", nombre: "Corredera cierre suave (juego)", unidad: "un", precio: 9900 },
+    { id: "tirador", cat: "herraje", nombre: "Tirador", unidad: "un", precio: 1890 },
+    { id: "pata", cat: "herraje", nombre: "Pata niveladora", unidad: "un", precio: 690 },
+    { id: "barra", cat: "herraje", nombre: "Barra de colgar", unidad: "m", precio: 2490 },
+    { id: "soporte", cat: "herraje", nombre: "Soportes de barra (par)", unidad: "un", precio: 1190 },
+
+    { id: "tornillos", cat: "insumo", nombre: "Tornillos y fijaciones", unidad: "global", precio: 2500 },
+    { id: "cola", cat: "insumo", nombre: "Cola de carpintero", unidad: "un", precio: 4900 },
+    { id: "lija", cat: "insumo", nombre: "Lija", unidad: "un", precio: 890 },
+    { id: "barniz", cat: "insumo", nombre: "Barniz o aceite", unidad: "un", precio: 18900 },
+    { id: "canto", cat: "insumo", nombre: "Tapacanto PVC 2 mm", unidad: "m", precio: 560 },
+    { id: "pintura", cat: "insumo", nombre: "Pintura o antióxido para fierro", unidad: "un", precio: 12900 },
+
+    { id: "taller", cat: "mano", nombre: "Hora de taller", unidad: "hora", precio: 12000 },
+    { id: "instalacion", cat: "mano", nombre: "Hora de instalación", unidad: "hora", precio: 15000 }
   ],
-  /* Madera dimensionada seca y cepillada, por escuadría en pulgadas.
-     Precio por metro lineal: se ingresa el largo y la cantidad de piezas. */
-  escuadrias: [
-    { id: "m1x4", nombre: "Pino seco cepillado", esp: 1, anc: 4, precio: 1290 },
-    { id: "m1x6", nombre: "Pino seco cepillado", esp: 1, anc: 6, precio: 1890 },
-    { id: "m1x8", nombre: "Pino seco cepillado", esp: 1, anc: 8, precio: 2490 },
-    { id: "m2x2", nombre: "Pino seco cepillado", esp: 2, anc: 2, precio: 1490 },
-    { id: "m2x4", nombre: "Pino seco cepillado", esp: 2, anc: 4, precio: 2690 },
-    { id: "m2x6", nombre: "Pino seco cepillado", esp: 2, anc: 6, precio: 3890 },
-    { id: "m2x8", nombre: "Pino seco cepillado", esp: 2, anc: 8, precio: 5190 }
-  ],
-  /* Perfiles de fierro, también por metro lineal */
-  perfiles: [
-    { id: "f30", nombre: "Tubo cuadrado 30×30×2 mm", precio: 2690 },
-    { id: "f40", nombre: "Tubo cuadrado 40×40×2 mm", precio: 3490 },
-    { id: "f5020", nombre: "Tubo rectangular 50×20×2 mm", precio: 3190 },
-    { id: "fang", nombre: "Ángulo 40×40×3 mm", precio: 3890 },
-    { id: "fplat", nombre: "Pletina 38×3 mm", precio: 2290 }
-  ],
-  /* Cantos: precio por metro lineal instalado */
-  cantos: [
-    { id: "fino", nombre: "Canto PVC 0,45 mm", precio: 190 },
-    { id: "grueso", nombre: "Canto PVC 2 mm", precio: 560 }
-  ],
-  /* Herrajes: precio por unidad o juego */
-  herrajes: {
-    bisagra: { nombre: "Bisagra con amortiguación", precio: 2690, unidad: "un." },
-    corredera: { nombre: "Corredera cierre suave (juego)", precio: 9900, unidad: "juego" },
-    tirador: { nombre: "Tirador", precio: 1890, unidad: "un." },
-    pata: { nombre: "Pata niveladora", precio: 690, unidad: "un." },
-    barra: { nombre: "Barra de colgar", precio: 2490, unidad: "m" },
-    soporteBarra: { nombre: "Soportes de barra (par)", precio: 1190, unidad: "par" },
-    fijaciones: { nombre: "Tornillos, minifix y tarugos", precio: 2500, unidad: "módulo" }
-  },
-  /* Mano de obra */
-  mano: {
-    fabricacion: { nombre: "Corte, canteado y perforado", precio: 9500, unidad: "m² de tablero" },
-    armado: { nombre: "Armado del módulo", precio: 12000, unidad: "módulo" },
-    instalacion: { nombre: "Instalación en obra", precio: 15000, unidad: "módulo" }
-  },
-  /* Parámetros de cálculo, en porcentaje */
+  /* Porcentajes sobre el costo directo */
   params: {
-    desperdicio: 12,   // recorte y despunte de tablero
-    gastos: 8,         // gastos generales sobre el costo directo
-    margen: 25,        // utilidad
-    redondeo: 100      // el precio unitario se redondea a este múltiplo
+    gastos: 8,       // gastos generales
+    margen: 25,      // utilidad
+    redondeo: 100    // el precio de cada partida se redondea a este múltiplo
   }
 };
 
 MQ.DEFAULT_EMPRESA = {
-  nombre: "Mi Mueblería",
-  logo: "",          // imagen en dataURL, ya reducida por MQ.procesarLogo
+  nombre: "Fierro & Veta",
+  logo: "",
   rut: "",
   telefono: "",
   email: "",
@@ -85,56 +101,45 @@ MQ.DEFAULT_EMPRESA = {
   condiciones: "50% de anticipo para iniciar la fabricación, saldo contra entrega.\nPlazo de entrega: 15 días hábiles desde la aprobación.\nLos valores no incluyen modificaciones de instalaciones eléctricas ni sanitarias."
 };
 
-/* ---------- tipos de mueble ----------
-   Cada tipo define las medidas y partes con que parte el formulario.
-   partes limita qué opciones se muestran: el cálculo es el mismo para todos. */
-MQ.TIPOS = [
-  {
-    id: "base", nombre: "Mueble base", descripcion: "Módulo de cocina o baño con zócalo",
-    partes: ["puertas", "cajones", "cajonCol", "entrepanos", "trasera", "zocalo", "cubierta"],
-    def: { ancho: 900, alto: 850, prof: 580, puertas: 2, cajones: 0, cajonCol: false, entrepanos: 1, trasera: true, zocalo: true, cubierta: false, barra: false }
-  },
-  {
-    id: "colgante", nombre: "Mueble colgante", descripcion: "Módulo mural sobre cubierta",
-    partes: ["puertas", "entrepanos", "trasera"],
-    def: { ancho: 800, alto: 700, prof: 350, puertas: 2, cajones: 0, entrepanos: 1, trasera: true, zocalo: false, cubierta: false, barra: false }
-  },
-  {
-    id: "closet", nombre: "Closet / armario", descripcion: "Con barra de colgar y cajones",
-    partes: ["puertas", "cajones", "cajonCol", "entrepanos", "trasera", "zocalo", "barra"],
-    def: { ancho: 1800, alto: 2200, prof: 600, puertas: 2, cajones: 3, cajonCol: true, entrepanos: 3, trasera: true, zocalo: true, cubierta: false, barra: true }
-  },
-  {
-    id: "cajonera", nombre: "Cajonera / velador", descripcion: "Los cajones reparten todo el alto",
-    partes: ["cajones", "trasera", "cubierta"],
-    def: { ancho: 450, alto: 550, prof: 450, puertas: 0, cajones: 3, entrepanos: 0, trasera: true, zocalo: false, cubierta: false, barra: false }
-  },
-  {
-    id: "librero", nombre: "Librero / estante", descripcion: "Repisas a la vista",
-    partes: ["puertas", "entrepanos", "trasera", "zocalo"],
-    def: { ancho: 800, alto: 1800, prof: 300, puertas: 0, cajones: 0, entrepanos: 4, trasera: true, zocalo: true, cubierta: false, barra: false }
-  },
-  {
-    id: "cubierta", nombre: "Cubierta / mesón", descripcion: "Solo el tablero horizontal",
-    /* el alto no se escribe: es el espesor del tablero que se elija */
-    partes: [],
-    def: { ancho: 2000, alto: 50, prof: 600, puertas: 0, cajones: 0, entrepanos: 0, trasera: false, zocalo: false, cubierta: false, barra: false }
-  }
-];
-
-MQ.tipo = (id) => MQ.TIPOS.find((t) => t.id === id) || MQ.TIPOS[0];
-
-/* Materiales con que parte un mueble nuevo */
-/* La cubierta tiene material propio: suele ser madera maciza mucho más
-   gruesa que los frentes, así que compartirlos daba despieces irreales. */
-MQ.DEFAULT_MATERIALES = { cuerpo: "mel18b", frente: "mel18m", trasera: "tras3", cajon: "mel15b", cubierta: "mad50" };
-
-MQ.nuevoMueble = function (tipoId) {
-  const t = MQ.tipo(tipoId || "base");
-  return Object.assign(
-    /* lineales: piezas de madera dimensionada y perfiles de fierro que se
-       compran por metro, con su largo y cantidad */
-    { id: MQ.uid(), tipo: t.id, nombre: "", cantidad: 1, instalar: true, lineales: [], mat: MQ.clone(MQ.DEFAULT_MATERIALES) },
-    MQ.clone(t.def)
-  );
+/* nombre con que se muestra un ítem: la madera lleva su escuadría adelante */
+MQ.nombreItem = function (it) {
+  if (!it) return "";
+  const esc = MQ.categoria(it.cat).escuadria && it.esp && it.anc ? it.esp + "×" + it.anc + '" ' : "";
+  return esc + (it.nombre || "");
 };
+
+/* ---------- croquis ----------
+   Cada partida tiene el suyo, con una o más vistas sobre la misma lámina. */
+/* nombre corto, para la etiqueta sobre la figura en el croquis: en la madera
+   basta la escuadría, y el resto se recorta para no tapar el dibujo */
+MQ.nombreCorto = function (it) {
+  if (!it) return "";
+  if (MQ.categoria(it.cat).escuadria && it.esp && it.anc) return it.esp + "×" + it.anc + '"';
+  const n = it.nombre || "";
+  return n.length > 20 ? n.slice(0, 19) + "…" : n;
+};
+
+MQ.nuevaVista = (nombre) => ({ id: MQ.uid(), nombre: nombre || "Frente", objetos: [] });
+MQ.nuevoCroquis = () => ({ escala: 100, acotar: true, vistas: [MQ.nuevaVista("Frente")] });
+
+/* ---------- partida ----------
+   Un mueble o trabajo de la cotización: su descripción, su croquis y los
+   materiales y horas que entran en fabricarlo. */
+MQ.nuevaPartida = () => ({
+  id: MQ.uid(),
+  nombre: "",
+  descripcion: "",
+  cantidad: 1,
+  lineas: [],
+  croquis: MQ.nuevoCroquis()
+});
+
+/* una línea de material: el ítem del catálogo y cuánto va.
+   En los ítems lineales se anota el largo de corte y el número de piezas. */
+MQ.nuevaLinea = (itemId, unidad) => ({
+  id: MQ.uid(), itemId,
+  cant: 1,
+  largo: MQ.UNIDADES[unidad] && MQ.UNIDADES[unidad].lineal ? 2000 : 0,
+  piezas: 1,
+  nota: ""
+});

@@ -9,62 +9,106 @@ MQ.store = (function () {
     set(k, v) { try { localStorage.setItem(P + k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } }
   };
 
-  /* Un catálogo guardado con una versión anterior puede no traer todas las
-     claves: se completa con los valores de referencia. */
+  /* ---------- catálogo ----------
+     La versión anterior guardaba listas separadas (tableros, escuadrías,
+     perfiles, cantos, herrajes). Se convierten a la lista única de ítems
+     para no perder los precios que ya estuvieran ajustados. La mano de obra
+     no se traslada: antes se cobraba por m² de tablero y ahora por hora, así
+     que ese número no significa lo mismo. */
+  function convertirViejo(c) {
+    const items = [];
+    const unidadHerraje = (u) => (u === "m" ? "m" : u === "módulo" ? "global" : "un");
+    (c.tableros || []).forEach((t) => items.push({
+      id: t.id, cat: "tablero", nombre: t.nombre, unidad: "plancha", precio: t.precio
+    }));
+    (c.escuadrias || []).forEach((e) => items.push({
+      id: e.id, cat: "madera", nombre: e.nombre || "Madera", esp: e.esp, anc: e.anc, unidad: "m", precio: e.precio
+    }));
+    (c.perfiles || []).forEach((p) => items.push({
+      id: p.id, cat: "perfil", nombre: p.nombre, unidad: "m", precio: p.precio
+    }));
+    (c.cantos || []).forEach((x) => items.push({
+      id: x.id, cat: "insumo", nombre: x.nombre, unidad: "m", precio: x.precio
+    }));
+    Object.keys(c.herrajes || {}).forEach((k) => {
+      const h = c.herrajes[k];
+      items.push({ id: k, cat: "herraje", nombre: h.nombre, unidad: unidadHerraje(h.unidad), precio: h.precio });
+    });
+    /* la mano de obra vuelve a los valores de referencia */
+    MQ.DEFAULT_CATALOGO.items.filter((x) => x.cat === "mano").forEach((x) => items.push(MQ.clone(x)));
+    return items;
+  }
+
   function mergeCatalogo(c) {
     const d = MQ.clone(MQ.DEFAULT_CATALOGO);
     if (!c) return d;
     const out = MQ.clone(d);
-    /* Un material que la app agrega después se incorpora a los catálogos que
-       ya estaban guardados, pero una sola vez: `incorporados` recuerda cuáles
-       se ofrecieron, para no reponer los que el usuario borró.
-       Antes era solo la lista de tableros, de ahí la compatibilidad. */
-    const previos = Array.isArray(c.incorporados) ? { tableros: c.incorporados } : (c.incorporados || {});
-    out.incorporados = {};
-    ["tableros", "escuadrias", "perfiles"].forEach((lista) => {
-      if (!Array.isArray(c[lista]) || !c[lista].length) {
-        out.incorporados[lista] = d[lista].map((x) => x.id);
-        return;
-      }
-      out[lista] = MQ.clone(c[lista]);
-      const vistos = (previos[lista] || []).slice();
-      d[lista].forEach((x) => {
-        if (vistos.indexOf(x.id) >= 0) return;
-        vistos.push(x.id);
-        if (!out[lista].some((y) => y.id === x.id)) out[lista].push(MQ.clone(x));
-      });
-      out.incorporados[lista] = vistos;
-    });
-    if (Array.isArray(c.cantos) && c.cantos.length) out.cantos = MQ.clone(c.cantos);
-    ["herrajes", "mano"].forEach((g) => {
-      Object.keys(out[g]).forEach((k) => {
-        if (c[g] && c[g][k]) out[g][k] = Object.assign(out[g][k], c[g][k]);
-      });
-    });
+    if (Array.isArray(c.items) && c.items.length) out.items = MQ.clone(c.items);
+    else if (c.tableros || c.escuadrias || c.herrajes) out.items = convertirViejo(c);
     out.params = Object.assign(out.params, c.params || {});
+    delete out.params.desperdicio;   // ya no se usa: se anota lo que se compra
     return out;
   }
+
   const mergeEmpresa = (e) => Object.assign(MQ.clone(MQ.DEFAULT_EMPRESA), e || {});
   const ordenar = (a) => a.sort((x, y) => (y.numero || 0) - (x.numero || 0) || String(y.actualizado || "").localeCompare(String(x.actualizado || "")));
+
+  /* ---------- cotizaciones ----------
+     Las guardadas con el configurador viejo traían `muebles` con sus medidas
+     y un croquis para toda la cotización. Se convierten a partidas: lo que
+     se puede conservar es el nombre, la cantidad y las piezas de madera y
+     perfiles; las medidas pasan a la descripción, que es donde viven ahora. */
+  function convertirCotizacion(q) {
+    if (!q || q.partidas || !Array.isArray(q.muebles)) return q;
+    const medidas = (m) => m.tipo === "cubierta"
+      ? m.ancho + " × " + m.prof + " mm"
+      : m.ancho + " × " + m.alto + " × " + m.prof + " mm";
+    q.partidas = q.muebles.map((m, i) => {
+      const p = MQ.nuevaPartida();
+      p.nombre = m.nombre || "Mueble " + (i + 1);
+      p.descripcion = medidas(m);
+      p.cantidad = m.cantidad || 1;
+      p.lineas = (m.lineales || []).map((l) => ({
+        id: MQ.uid(), itemId: l.matId, cant: 1,
+        largo: l.largo || 0, piezas: l.cant || 1, nota: ""
+      }));
+      return p;
+    });
+    /* el croquis era uno solo: queda en la primera partida */
+    if (q.croquis && q.partidas.length) {
+      const v = MQ.nuevaVista("Frente");
+      v.objetos = q.croquis.objetos || [];
+      q.partidas[0].croquis = { escala: q.croquis.escala || 100, acotar: true, vistas: [v] };
+    }
+    delete q.muebles; delete q.croquis;
+    return q;
+  }
+
+  function sanear(q) {
+    if (!q) return q;
+    convertirCotizacion(q);
+    if (!Array.isArray(q.partidas)) q.partidas = [];
+    if (!q.cliente) q.cliente = {};
+    q.partidas.forEach((p) => {
+      if (!Array.isArray(p.lineas)) p.lineas = [];
+      if (!p.croquis || !Array.isArray(p.croquis.vistas)) p.croquis = MQ.nuevoCroquis();
+      if (!p.croquis.vistas.length) p.croquis.vistas = [MQ.nuevaVista("Frente")];
+    });
+    return q;
+  }
 
   const S = {
     catalogo: mergeCatalogo(LS.get("catalogo")),
     empresa: mergeEmpresa(LS.get("empresa")),
-    quotes: ordenar(LS.get("quotes") || []),
+    quotes: ordenar((LS.get("quotes") || []).map(sanear)),
     listeners: []
   };
   const emit = (kind) => S.listeners.forEach((fn) => fn(kind));
   S.on = (fn) => S.listeners.push(fn);
 
-  S.saveCatalogo = function (c) {
-    S.catalogo = mergeCatalogo(c); LS.set("catalogo", S.catalogo); emit("catalogo");
-  };
-  S.resetCatalogo = function () {
-    S.catalogo = MQ.clone(MQ.DEFAULT_CATALOGO); LS.set("catalogo", S.catalogo); emit("catalogo");
-  };
-  S.saveEmpresa = function (e) {
-    S.empresa = mergeEmpresa(e); LS.set("empresa", S.empresa); emit("empresa");
-  };
+  S.saveCatalogo = function (c) { S.catalogo = mergeCatalogo(c); LS.set("catalogo", S.catalogo); emit("catalogo"); };
+  S.resetCatalogo = function () { S.catalogo = MQ.clone(MQ.DEFAULT_CATALOGO); LS.set("catalogo", S.catalogo); emit("catalogo"); };
+  S.saveEmpresa = function (e) { S.empresa = mergeEmpresa(e); LS.set("empresa", S.empresa); emit("empresa"); };
 
   S.nextNumero = () => S.quotes.reduce((mx, q) => Math.max(mx, q.numero || 0), 0) + 1;
 
@@ -82,8 +126,24 @@ MQ.store = (function () {
     S.quotes = S.quotes.filter((q) => q.id !== id); LS.set("quotes", S.quotes); emit("quotes");
   };
 
-  S.loadDraft = () => LS.get("draft");
+  S.loadDraft = () => sanear(LS.get("draft"));
   S.saveDraft = (q) => LS.set("draft", q);
+
+  /* ---------- plantillas ----------
+     Una partida que se guarda para reusar: el reemplazo de los tipos de
+     mueble, pero hecho de lo que uno ya cotizó. */
+  S.plantillas = LS.get("plantillas") || [];
+  S.savePlantilla = function (p) {
+    const t = MQ.clone(p);
+    t.id = MQ.uid();
+    t.guardado = new Date().toISOString();
+    S.plantillas.push(t);
+    LS.set("plantillas", S.plantillas); emit("plantillas");
+  };
+  S.deletePlantilla = function (id) {
+    S.plantillas = S.plantillas.filter((t) => t.id !== id);
+    LS.set("plantillas", S.plantillas); emit("plantillas");
+  };
 
   return S;
 })();

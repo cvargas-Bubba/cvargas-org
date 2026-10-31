@@ -1,10 +1,10 @@
-/* Croquis de la cotización: un dibujo acotado, hecho con líneas, rectángulos,
-   rombos, polilíneas, texto y cotas sobre una grilla.
+/* Croquis de una partida: una o más vistas (frente, planta, lateral) sobre
+   la misma grilla, dibujadas con líneas, rectángulos, rombos, polilíneas,
+   trazo a mano alzada, texto y cotas.
 
-   Se guarda como vectores (listas de puntos), no como imagen: ocupa unos pocos
-   KB en lugar de cientos, se puede seguir editando y sale nítido en el PDF,
-   porque `figura()` devuelve la misma estructura que MQ.draw y la dibuja el
-   mismo render de pdf.js. */
+   Se guarda como vectores, no como imagen: pesa unos pocos KB, se puede
+   seguir editando y `figura()` devuelve la misma estructura que dibuja el
+   render en PDF, así que sale nítido en papel. */
 window.MQ = window.MQ || {};
 
 MQ.croquis = (function () {
@@ -15,11 +15,11 @@ MQ.croquis = (function () {
   const CERCA = 12;          // para cerrar una polilínea sobre su primer punto
   const TOLERANCIA = 10;     // cuánto se puede errar el clic sobre un trazo
   const DOBLE = 500;         // ventana del doble clic, como la de Windows
+  const PASO_LAPIZ = 4;      // separación mínima entre puntos a mano alzada
+  /* bajo estos tamaños la medida escrita dentro de la figura no se lee */
+  const MIN_W = 42, MIN_H = 13;
 
-  const nuevo = () => ({ escala: 100, objetos: [] });
-  /* milímetros que mide una unidad del lienzo */
   const mmPorUnidad = (c) => MQ.num(c.escala, 100) / CELDA;
-
   const ajustar = (v, libre) => (libre ? Math.round(v) : Math.round(v / PASO) * PASO);
   const dentro = (v, max) => Math.max(0, Math.min(max, v));
   const largo = (o) => Math.hypot(o.x2 - o.x1, o.y2 - o.y1);
@@ -33,11 +33,30 @@ MQ.croquis = (function () {
       const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
       return [{ x: cx, y: o.y }, { x: o.x + o.w, y: cy }, { x: cx, y: o.y + o.h }, { x: o.x, y: cy }];
     }
-    if (o.t === "poli") return o.pts.map((p) => ({ x: p.x, y: p.y }));
+    if (o.t === "poli" || o.t === "lapiz") return o.pts.map((p) => ({ x: p.x, y: p.y }));
     if (o.t === "texto") return [{ x: o.x, y: o.y }];
     return [{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }];
   }
   const cerrada = (o) => o.t === "rect" || o.t === "rombo" || (o.t === "poli" && o.cerrado);
+
+  /* ---------- largo de una figura, en mm ----------
+     Es lo que permite que el croquis entregue la cantidad de material: un
+     trazo asignado a una escuadría es una pieza de ese largo. En las figuras
+     de caja se toma el lado mayor, que es como se pide el corte. */
+  function largoMm(o, mm) {
+    if (!o) return 0;
+    if (o.t === "texto") return 0;
+    if (o.t === "rect" || o.t === "rombo") return Math.max(Math.abs(o.w), Math.abs(o.h)) * mm;
+    const v = vertices(o);
+    let d = 0;
+    const n = cerrada(o) ? v.length : v.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = v[i], b = v[(i + 1) % v.length];
+      d += Math.hypot(b.x - a.x, b.y - a.y);
+    }
+    return d * mm;
+  }
+  const piezasDe = (o) => Math.max(1, Math.round(MQ.num(o && o.piezas, 1)));
 
   function caja(o) {
     if (o.t === "texto") {
@@ -60,13 +79,12 @@ MQ.croquis = (function () {
     return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
   }
 
-  /* distancia al contorno de la figura, no a su interior: un rectángulo se
-     agarra del borde, para poder dibujar dentro de él sin seleccionarlo */
+  /* distancia al contorno, no al interior: un rectángulo se agarra del borde,
+     para poder dibujar dentro de él sin seleccionarlo */
   function distancia(o, x, y) {
     if (o.t === "texto") {
       const c = caja(o);
-      const dx = Math.max(c.x1 - x, 0, x - c.x2), dy = Math.max(c.y1 - y, 0, y - c.y2);
-      return Math.hypot(dx, dy);
+      return Math.hypot(Math.max(c.x1 - x, 0, x - c.x2), Math.max(c.y1 - y, 0, y - c.y2));
     }
     const v = vertices(o);
     let d = Infinity;
@@ -78,24 +96,23 @@ MQ.croquis = (function () {
     return d;
   }
 
-  /* El objeto que está bajo el punto, probando del último al primero para que
-     gane el que se dibujó encima. */
-  function objetoEn(c, x, y) {
-    for (let i = (c.objetos || []).length - 1; i >= 0; i--) {
-      if (distancia(c.objetos[i], x, y) < TOLERANCIA) return c.objetos[i];
+  /* del último al primero, para que gane el que se dibujó encima */
+  function objetoEn(objetos, x, y) {
+    for (let i = (objetos || []).length - 1; i >= 0; i--) {
+      if (distancia(objetos[i], x, y) < TOLERANCIA) return objetos[i];
     }
     return null;
   }
 
   function mover(o, dx, dy) {
     if (o.t === "rect" || o.t === "rombo" || o.t === "texto") { o.x += dx; o.y += dy; }
-    else if (o.t === "poli") o.pts.forEach((p) => { p.x += dx; p.y += dy; });
+    else if (o.t === "poli" || o.t === "lapiz") o.pts.forEach((p) => { p.x += dx; p.y += dy; });
     else { o.x1 += dx; o.y1 += dy; o.x2 += dx; o.y2 += dy; }
   }
 
   /* Lo que muestra una cota: la etiqueta escrita a mano si la hay, y si no la
-     medida que sale de su largo y de la escala de la grilla. Un número suelto
-     se completa con la unidad; cualquier otro texto se respeta tal cual. */
+     medida que sale de su largo y de la escala. Un número suelto se completa
+     con la unidad; cualquier otro texto se respeta tal cual. */
   function etiquetaCota(o, mm) {
     const e = (o.etiqueta || "").trim();
     if (!e) return Math.round(largo(o) * mm) + " mm";
@@ -103,9 +120,7 @@ MQ.croquis = (function () {
   }
 
   /* ---------- dibujo ---------- */
-  /* Devuelve {w, h, formas} igual que MQ.draw.figura, para que lo pinten tanto
-     el SVG de la pantalla como el render en PDF. */
-  function figura(c, opciones) {
+  function figura(croquis, vista, opciones) {
     const op = opciones || {};
     const formas = [];
     const linea = (x1, y1, x2, y2, clase) => formas.push({ t: "linea", x1, y1, x2, y2, clase });
@@ -117,31 +132,62 @@ MQ.croquis = (function () {
       for (let y = CELDA; y < H; y += CELDA) linea(0, y, W, y, "grid");
     }
 
-    const mm = mmPorUnidad(c);
-    (c.objetos || []).forEach((o) => {
+    const mm = mmPorUnidad(croquis);
+    const acotar = croquis.acotar !== false;
+    /* medida de la figura, escrita dentro, sin tener que dibujar la cota */
+    const acote = (o) => {
+      if (!acotar) return;
+      if (o.t === "rect" || o.t === "rombo") {
+        const an = Math.abs(o.w), al = Math.abs(o.h);
+        if (an < MIN_W || al < MIN_H) return;
+        texto(o.x + o.w / 2, o.y + o.h / 2 + 3, Math.round(an * mm) + " × " + Math.round(al * mm), "acote");
+      } else if (o.t === "linea") {
+        const l = largo(o);
+        if (l < MIN_W) return;
+        texto((o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2 - 6, Math.round(l * mm) + " mm", "acote");
+      }
+    };
+
+    /* etiqueta del material asignado, para ver de un vistazo qué es cada trazo */
+    const marcaMat = (o) => {
+      if (!o.mat || !op.nombreMat) return;
+      const n = op.nombreMat(o.mat);
+      if (!n) return;
+      const b = caja(o);
+      const p = piezasDe(o);
+      /* bien por encima de la figura: ahí abajo va la medida acotada */
+      texto((b.x1 + b.x2) / 2, b.y1 - 15, (p > 1 ? p + " × " : "") + n, "mat");
+    };
+
+    (vista.objetos || []).forEach((o) => {
+      marcaMat(o);
       if (o.t === "rect") {
         formas.push({ t: "rect", x: Math.min(o.x, o.x + o.w), y: Math.min(o.y, o.y + o.h), w: Math.abs(o.w), h: Math.abs(o.h), clase: "trazo" });
-      } else if (o.t === "rombo" || o.t === "poli") {
-        poli(vertices(o), cerrada(o), "trazo");
+        acote(o);
+      } else if (o.t === "rombo") {
+        poli(vertices(o), true, "trazo"); acote(o);
+      } else if (o.t === "poli") {
+        poli(vertices(o), o.cerrado, "trazo");
+      } else if (o.t === "lapiz") {
+        poli(vertices(o), false, "lapiz");
       } else if (o.t === "texto") {
         texto(o.x, o.y, o.s, "rotulo");
       } else if (o.t === "cota") {
         linea(o.x1, o.y1, o.x2, o.y2, "cota");
-        /* topes en los extremos, perpendiculares a la cota */
         const d = largo(o) || 1;
         const nx = -(o.y2 - o.y1) / d * 5, ny = (o.x2 - o.x1) / d * 5;
         linea(o.x1 - nx, o.y1 - ny, o.x1 + nx, o.y1 + ny, "cota");
         linea(o.x2 - nx, o.y2 - ny, o.x2 + nx, o.y2 + ny, "cota");
         texto((o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2 - 7, etiquetaCota(o, mm), "dm");
       } else {
-        linea(o.x1, o.y1, o.x2, o.y2, "trazo");
+        linea(o.x1, o.y1, o.x2, o.y2, "trazo"); acote(o);
       }
     });
 
     (op.previas || []).forEach((f) => formas.push(f));
 
     const marco = (id, clase) => {
-      const o = id && (c.objetos || []).find((x) => x.id === id);
+      const o = id && (vista.objetos || []).find((x) => x.id === id);
       if (!o) return;
       const b = caja(o), m = 8;
       formas.push({ t: "rect", x: b.x1 - m, y: b.y1 - m, w: b.x2 - b.x1 + m * 2, h: b.y2 - b.y1 + m * 2, clase });
@@ -152,27 +198,29 @@ MQ.croquis = (function () {
     return { w: W, h: H, formas };
   }
 
-  const vacio = (c) => !c || !(c.objetos || []).length;
+  const vistaVacia = (v) => !v || !(v.objetos || []).length;
+  const vacio = (c) => !c || !(c.vistas || []).some((v) => !vistaVacia(v));
+  /* las vistas con algo dibujado, que son las que salen en el PDF */
+  const conDibujo = (c) => ((c && c.vistas) || []).filter((v) => !vistaVacia(v));
 
-  /* ---------- editor ---------- */
-  /* Monta el editor sobre `cont`. `leer()` entrega el croquis en edición y
-     `alCambiar()` avisa para guardar. */
-  function montar(cont, leer, alCambiar) {
+  /* ---------- editor ----------
+     `leer()` entrega { croquis, vista } con la vista que se está editando. */
+  function montar(cont, leer, alCambiar, nombreMat) {
     let herramienta = "sel";
     let libre = false;      // sin ajuste a la grilla
-    let sel = null;         // id del objeto seleccionado
-    let hover = null;       // id del objeto bajo el cursor
-    let trazando = null;    // {x1, y1, x2, y2} mientras se arrastra
-    let arrastre = null;    // {id, x, y} mientras se mueve un objeto
+    let sel = null, hover = null;
+    let trazando = null;    // mientras se arrastra una figura
+    let arrastre = null;    // mientras se mueve un objeto
     let cadena = null;      // puntos de la polilínea en curso
-    let cursor = null;      // posición del cursor, para la línea elástica
-    let anterior = null;    // clic previo, para reconocer el doble clic
-    let ultimoDoble = 0;    // para no atender dos veces el mismo doble clic
+    let mano = null;        // puntos del trazo a mano alzada en curso
+    let cursor = null;
+    let anterior = null, ultimoDoble = 0;
     const historia = [];
 
+    const objetos = () => leer().vista.objetos;
     const esDibujo = () => herramienta !== "sel";
     const guardar = () => {
-      historia.push(JSON.stringify(leer().objetos));
+      historia.push(JSON.stringify(objetos()));
       if (historia.length > 30) historia.shift();
     };
 
@@ -188,6 +236,7 @@ MQ.croquis = (function () {
           f.push({ t: "linea", x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2, clase: "previa" });
         }
       }
+      if (mano && mano.length > 1) f.push({ t: "poli", pts: mano, cerrado: false, clase: "lapiz" });
       if (cadena && cadena.length) {
         const pts = cursor ? cadena.concat([cursor]) : cadena.slice();
         if (pts.length > 1) f.push({ t: "poli", pts, cerrado: false, clase: "previa" });
@@ -199,9 +248,10 @@ MQ.croquis = (function () {
     /* El <svg> se crea una sola vez y después solo cambia su contenido */
     let lienzo = null;
     function pintar() {
-      const fig = figura(leer(), { grilla: true, sel, hover, previas: previas() });
-      if (!lienzo) {
-        cont.innerHTML = MQ.draw.svg(fig, "Croquis de la cotización");
+      const c = leer();
+      const fig = figura(c.croquis, c.vista, { grilla: true, sel, hover, nombreMat, previas: previas() });
+      if (!lienzo || !cont.contains(lienzo)) {
+        cont.innerHTML = MQ.draw.svg(fig, "Croquis");
         lienzo = cont.querySelector("svg");
       } else {
         lienzo.innerHTML = MQ.draw.formas(fig);
@@ -211,30 +261,28 @@ MQ.croquis = (function () {
       cont.classList.toggle("moviendo", !!arrastre);
     }
 
-    /* punto del evento en coordenadas del lienzo */
-    function punto(ev) {
+    function punto(ev, sinAjuste) {
       const svg = lienzo || cont.querySelector("svg");
       const p = svg.createSVGPoint();
       p.x = ev.clientX; p.y = ev.clientY;
       const m = svg.getScreenCTM();
       const q = m ? p.matrixTransform(m.inverse()) : { x: 0, y: 0 };
-      return { x: dentro(ajustar(q.x, libre), W), y: dentro(ajustar(q.y, libre), H) };
+      const l = sinAjuste || libre;
+      return { x: dentro(ajustar(q.x, l), W), y: dentro(ajustar(q.y, l), H) };
     }
 
-    /* ---- edición del texto de un objeto ---- */
     function editarTexto(o) {
       const c = leer();
       if (o.t === "cota") {
-        const actual = (o.etiqueta || "").trim() || String(Math.round(largo(o) * mmPorUnidad(c)));
+        const actual = (o.etiqueta || "").trim() || String(Math.round(largo(o) * mmPorUnidad(c.croquis)));
         const v = prompt("Medida de la cota.\nDéjalo vacío para que vuelva a calcularse sola.", actual);
         if (v === null) return;
-        guardar();
-        o.etiqueta = v.trim();
+        guardar(); o.etiqueta = v.trim();
       } else if (o.t === "texto") {
         const v = prompt("Texto del rótulo:", o.s);
         if (v === null) return;
         guardar();
-        if (!v.trim()) c.objetos = c.objetos.filter((x) => x.id !== o.id);
+        if (!v.trim()) c.vista.objetos = c.vista.objetos.filter((x) => x.id !== o.id);
         else o.s = v.trim();
       } else return;
       sel = null; pintar(); alCambiar();
@@ -247,38 +295,38 @@ MQ.croquis = (function () {
         guardar();
         const cerrar = pts.length > 2 && Math.hypot(pts[pts.length - 1].x - pts[0].x, pts[pts.length - 1].y - pts[0].y) < CERCA;
         if (cerrar) pts.pop();
-        leer().objetos.push({ id: MQ.uid(), t: "poli", pts, cerrado: cerrar });
+        objetos().push({ id: MQ.uid(), t: "poli", pts, cerrado: cerrar });
         alCambiar();
       }
       pintar();
     }
 
     cont.addEventListener("pointerdown", (ev) => {
-      const c = leer(), p = punto(ev);
+      const p = punto(ev);
       cont.setPointerCapture(ev.pointerId);
 
-      /* Doble clic medido por tiempo y distancia, en vez del evento dblclick:
-         así funciona igual con el dedo, donde ese evento no es confiable. */
       const ahora = Date.now();
       const doble = anterior && ahora - anterior.t < DOBLE && Math.hypot(p.x - anterior.x, p.y - anterior.y) < 15;
       anterior = { t: ahora, x: p.x, y: p.y };
       if (doble) ultimoDoble = ahora;
 
       if (herramienta === "sel") {
-        const o = objetoEn(c, p.x, p.y);
+        const o = objetoEn(objetos(), p.x, p.y);
         if (doble && o) { editarTexto(o); return; }
         sel = o ? o.id : null;
         if (o) { guardar(); arrastre = { id: o.id, x: p.x, y: p.y }; }
         pintar(); alCambiar();
         return;
       }
+      if (herramienta === "lapiz") {
+        /* a mano alzada el ajuste a la grilla estorba */
+        mano = [punto(ev, true)];
+        pintar();
+        return;
+      }
       if (herramienta === "texto") {
         const s = (prompt("Texto del rótulo:") || "").trim();
-        if (s) {
-          guardar();
-          c.objetos.push({ id: MQ.uid(), t: "texto", x: p.x, y: p.y, s });
-          alCambiar();
-        }
+        if (s) { guardar(); objetos().push({ id: MQ.uid(), t: "texto", x: p.x, y: p.y, s }); alCambiar(); }
         pintar();
         return;
       }
@@ -287,7 +335,6 @@ MQ.croquis = (function () {
         cadena = cadena || [];
         const primero = cadena[0];
         cadena.push(p);
-        /* volver sobre el primer punto cierra la figura */
         if (primero && cadena.length > 2 && Math.hypot(p.x - primero.x, p.y - primero.y) < CERCA) terminarCadena();
         else pintar();
         return;
@@ -297,18 +344,23 @@ MQ.croquis = (function () {
 
     cont.addEventListener("pointermove", (ev) => {
       if (arrastre) {
-        const c = leer(), p = punto(ev);
-        const o = c.objetos.find((x) => x.id === arrastre.id);
+        const p = punto(ev);
+        const o = objetos().find((x) => x.id === arrastre.id);
         if (o) { mover(o, p.x - arrastre.x, p.y - arrastre.y); arrastre.x = p.x; arrastre.y = p.y; }
         pintar();
+        return;
+      }
+      if (mano) {
+        const p = punto(ev, true);
+        const u = mano[mano.length - 1];
+        if (Math.hypot(p.x - u.x, p.y - u.y) >= PASO_LAPIZ) { mano.push(p); pintar(); }
         return;
       }
       const p = punto(ev);
       if (trazando) { trazando.x2 = p.x; trazando.y2 = p.y; pintar(); return; }
       if (cadena) { cursor = p; pintar(); return; }
       if (herramienta === "sel") {
-        /* resaltar lo que hay debajo, para saber dónde hacer clic */
-        const o = objetoEn(leer(), p.x, p.y);
+        const o = objetoEn(objetos(), p.x, p.y);
         const id = o ? o.id : null;
         if (id !== hover) { hover = id; pintar(); }
       }
@@ -316,22 +368,26 @@ MQ.croquis = (function () {
 
     cont.addEventListener("pointerleave", () => { if (hover) { hover = null; pintar(); } });
 
-    /* Segunda vía: el evento nativo, por si el doble clic llegó más lento que
-       la ventana de arriba. Se ignora si ese doble clic ya se atendió. */
+    /* el evento nativo, por si el doble clic llegó más lento que la ventana */
     cont.addEventListener("dblclick", (ev) => {
       if (Date.now() - ultimoDoble < 700) return;
       if (herramienta === "poli") { if (cadena) terminarCadena(); return; }
       if (herramienta !== "sel") return;
       const p = punto(ev);
-      const o = objetoEn(leer(), p.x, p.y);
+      const o = objetoEn(objetos(), p.x, p.y);
       if (o) { ultimoDoble = Date.now(); editarTexto(o); }
     });
 
     function soltar() {
       if (arrastre) { arrastre = null; pintar(); alCambiar(); return; }
+      if (mano) {
+        const pts = mano; mano = null;
+        if (pts.length > 2) { guardar(); objetos().push({ id: MQ.uid(), t: "lapiz", pts }); alCambiar(); }
+        pintar();
+        return;
+      }
       if (!trazando) return;
       const t = trazando; trazando = null;
-      const c = leer();
       const caj = herramienta === "rect" || herramienta === "rombo";
       const chico = caj
         ? Math.abs(t.x2 - t.x1) < MIN || Math.abs(t.y2 - t.y1) < MIN
@@ -339,13 +395,13 @@ MQ.croquis = (function () {
       if (!chico) {
         guardar();
         if (caj) {
-          c.objetos.push({
+          objetos().push({
             id: MQ.uid(), t: herramienta,
             x: Math.min(t.x1, t.x2), y: Math.min(t.y1, t.y2),
             w: Math.abs(t.x2 - t.x1), h: Math.abs(t.y2 - t.y1)
           });
         } else {
-          c.objetos.push({ id: MQ.uid(), t: herramienta === "cota" ? "cota" : "linea", x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2 });
+          objetos().push({ id: MQ.uid(), t: herramienta === "cota" ? "cota" : "linea", x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2 });
         }
         alCambiar();
       }
@@ -356,40 +412,53 @@ MQ.croquis = (function () {
 
     return {
       pintar,
-      herramienta(h) {
-        if (cadena) terminarCadena();
-        herramienta = h; sel = null; hover = null; pintar();
+      /* al cambiar de vista o de partida se limpia lo que estaba en curso */
+      reiniciar() { cadena = null; mano = null; trazando = null; sel = null; hover = null; historia.length = 0; pintar(); },
+      /* ---- material de la figura seleccionada ---- */
+      seleccionado() {
+        const o = sel && objetos().find((x) => x.id === sel);
+        return o && o.t !== "texto" ? o : null;
       },
+      asignar(mat, piezas) {
+        const o = this.seleccionado();
+        if (!o) return false;
+        guardar();
+        if (mat !== undefined) { if (mat) o.mat = mat; else delete o.mat; }
+        if (piezas !== undefined) o.piezas = Math.max(1, Math.round(MQ.num(piezas, 1)));
+        pintar(); alCambiar();
+        return true;
+      },
+      herramienta(h) { if (cadena) terminarCadena(); herramienta = h; sel = null; hover = null; pintar(); },
       ajuste(v) { libre = !v; },
       enCadena: () => !!cadena,
       cerrarCadena() { if (cadena) terminarCadena(); },
       editarSeleccion() {
-        const o = sel && leer().objetos.find((x) => x.id === sel);
+        const o = sel && objetos().find((x) => x.id === sel);
         if (!o || (o.t !== "cota" && o.t !== "texto")) return false;
         editarTexto(o);
         return true;
       },
       borrar() {
-        const c = leer();
         if (!sel) return false;
         guardar();
-        c.objetos = c.objetos.filter((o) => o.id !== sel);
+        const c = leer();
+        c.vista.objetos = c.vista.objetos.filter((o) => o.id !== sel);
         sel = null; hover = null; pintar(); alCambiar();
         return true;
       },
       deshacer() {
         if (!historia.length) return false;
-        leer().objetos = JSON.parse(historia.pop());
+        leer().vista.objetos = JSON.parse(historia.pop());
         sel = null; hover = null; cadena = null; pintar(); alCambiar();
         return true;
       },
       limpiar() {
         guardar();
-        leer().objetos = [];
+        leer().vista.objetos = [];
         sel = null; hover = null; cadena = null; pintar(); alCambiar();
       }
     };
   }
 
-  return { nuevo, figura, montar, vacio, mmPorUnidad, W, H, CELDA };
+  return { figura, montar, vacio, vistaVacia, conDibujo, mmPorUnidad, largoMm, piezasDe, W, H, CELDA };
 })();

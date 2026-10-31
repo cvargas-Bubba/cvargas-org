@@ -1,94 +1,66 @@
-# Cotizador de Muebles
+# Cotizador de muebles
 
-Cotizador de muebles a medida: se ingresan las medidas y el mueble se cotiza solo,
-con despiece y lista de compra. Funciona en el navegador, sin servidor ni instalación.
+Herramienta interna del taller: se dibuja el croquis del mueble, se le asigna
+material a cada trazo y de ahí sale el costo y la cotización. Funciona en el
+navegador, sin servidor ni instalación.
 
 👉 **https://cvargas.org/muebles/**
 
-## Qué hace
+## Cómo funciona
 
-- **Cotiza por medidas.** Eliges el tipo de mueble (base, colgante, closet, cajonera,
-  librero, cubierta), pones ancho, alto y profundidad y defines puertas, cajones,
-  entrepaños, zócalo y barra de colgar. El precio se arma desde el despiece real.
-- **Calcula el despiece.** Cada pieza con su medida de corte, el tablero que le
-  corresponde y en qué bordes lleva canto.
-- **Lista de compra.** Planchas, metros de canto y herrajes de toda la cotización,
-  con el porcentaje de desperdicio aplicado.
-- **Catálogo editable.** Tableros, cantos, herrajes, mano de obra, desperdicio,
-  gastos generales y margen se editan en la app y quedan guardados. Los
-  tableros marcados como **macizos** no llevan tapacanto: el canto queda a la
-  vista, se lija y se termina.
-- **Cubiertas de madera.** La cubierta tiene tablero propio, aparte del de los
-  frentes, porque suele ser mucho más gruesa. En un mesón el alto no se
-  escribe: es el espesor del tablero que elijas.
-- **Madera dimensionada y perfiles de fierro.** Si el tablero lo armas tú, en
-  cada mueble anotas las piezas que vas a ocupar: escuadría, largo y cuántas
-  van. Se cobran por metro lineal según la escuadría, y en cuanto hay una
-  pieza de madera **la cubierta deja de cobrarse como tablero**, porque la
-  estás fabricando, no comprando. La superficie sí sigue sumando mano de
-  obra: hay que cepillarla, encolarla y lijarla.
-- **Envío por WhatsApp.** En el celular entrega el PDF a la hoja de compartir
-  del sistema, así que llega **adjunto** al chat. En el navegador de
-  escritorio esa API no acepta archivos: ahí descarga el PDF y abre el chat
-  con el resumen para que lo adjuntes con el clip.
-- **PDF de cotización y de despiece**, con tu logo, los datos de tu empresa y
-  tus condiciones comerciales.
-- **Logo propio.** Se sube en Empresa (PNG, JPG, SVG o WebP), se reduce solo
-  para no ocupar espacio de más y aparece en la hoja de cotización y en el
-  encabezado de cada página de los PDF.
-- **Hoja de esquemas.** El PDF de la cotización termina con el dibujo de cada
-  mueble, acotado y con la medida de corte escrita en cada puerta y cajón.
-- **Croquis.** Un dibujo propio por cotización, hecho con líneas, rectángulos,
-  rombos, figuras de varios puntos, rótulos y cotas sobre una grilla con
-  ajuste automático. Las cotas calculan solas su medida a partir de la escala
-  de la grilla, y con doble clic puedes escribir la tuya cuando necesites la
-  medida real en vez de la del dibujo; si la borras, vuelve a calcularse sola.
-  Se guarda como vectores, no como imagen, así que pesa unos pocos KB y sale
-  nítido en el PDF.
-- **Historial** de cotizaciones, para reabrir, duplicar y seguir su estado.
+Una cotización se arma por **partidas**: cada una es un mueble o trabajo, con
+su croquis, sus materiales y su precio.
 
-## Cómo calcula el precio
+**El croquis da las medidas.** Se dibuja sobre una grilla con escala conocida
+(un cuadro = tantos mm). A cada figura se le puede asignar un material y un
+número de piezas iguales: el largo sale del dibujo, así que no hay que
+escribirlo otra vez. Si se mueve el trazo, la cantidad se actualiza sola.
+
+Cada partida puede tener varias **vistas** —frente, planta, lateral— en la
+misma lámina.
+
+**Lo que no se dibuja se agrega a mano**: tornillos, cola, barniz, horas de
+taller. Cada ítem del catálogo trae su unidad, y eso define cómo se carga.
 
 ```
-costo directo = tableros + cantos + herrajes + mano de obra
-precio neto   = (costo directo + gastos generales) + margen
+costo directo = materiales + horas
+precio        = (costo directo + gastos generales) + margen
 total         = (neto − descuento) + IVA
 ```
 
-- Los tableros se cargan a precio de plancha entera y cada pieza paga su
-  superficie prorrateada, más el porcentaje de desperdicio.
-- Las planchas de la lista de compra se redondean hacia arriba. **No es una
-  optimización de corte**: es superficie más desperdicio, así que en muebles
-  grandes conviene revisar el nesting antes de comprar.
-- Los precios que vienen cargados son de referencia. Hay que reemplazarlos por los
-  tuyos en **Materiales** antes de cotizarle a un cliente.
+## Dos documentos, un propósito distinto cada uno
+
+| | Para quién | Qué lleva |
+|---|---|---|
+| **Cotización** | El cliente | Qué es, el croquis, de qué está hecho y cuánto vale. Sin cantidades ni costos de material |
+| **Hoja de taller** | El taller | Los cortes, las cantidades, los costos y la lista de compra |
+
+Los materiales aparecen en la cotización solo como argumento de calidad: se
+nombran, no se cuantifican ni se les pone precio.
+
+## Plantillas
+
+Una partida que ya se cotizó se puede guardar como plantilla, con su croquis y
+sus materiales, para partir de ahí la próxima vez y ajustar cantidades.
 
 ## Dónde quedan los datos
 
-Todo se guarda en el `localStorage` del navegador que usas: cotizaciones, catálogo
-y datos de la empresa. No hay servidor, no se comparte entre equipos y si borras
-los datos del sitio se pierde. Para respaldar algo, descarga el PDF.
+En el `localStorage` del navegador que se use: cotizaciones, catálogo,
+plantillas y logo. No hay servidor, no se comparte entre equipos y si se borran
+los datos del sitio se pierde. Para respaldar algo, descargar el PDF.
 
-## Desarrollo
-
-No hay build ni dependencias que instalar. Basta con abrir `index.html`, o servir
-la carpeta:
-
-```bash
-python -m http.server 8000
-```
+## Archivos
 
 | Archivo | Qué contiene |
 |---|---|
-| `data.js` | catálogo de referencia, tipos de mueble y utilidades |
-| `calc.js` | despiece, herrajes y costeo |
-| `draw.js` | esquema frontal del mueble, como lista de formas |
-| `croquis.js` | editor de croquis y su figura para el PDF |
-| `logo.js` | carga del logo, reducción y conversión para jsPDF |
+| `data.js` | catálogo de referencia, unidades y estructuras base |
+| `croquis.js` | editor del croquis y la figura para el PDF |
+| `calc.js` | costeo de partidas y lista de compra |
+| `draw.js` | serializa una figura a SVG |
 | `store.js` | persistencia en `localStorage` |
-| `pdf.js` | PDF de cotización y de despiece (jsPDF) |
-| `app.js` | interfaz y eventos |
-| `styles.css` | estilos |
+| `logo.js` | carga y reducción del logo |
+| `pdf.js` | cotización y hoja de taller (jsPDF) |
+| `app.js` | interfaz |
 
-Convención del proyecto: JavaScript sin framework, todo bajo el namespace global
-`MQ`, textos y formatos en es-CL y precios netos en pesos chilenos.
+JavaScript sin framework, todo bajo el namespace global `MQ`, textos en es-CL y
+precios netos en pesos chilenos.
