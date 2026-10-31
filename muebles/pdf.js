@@ -26,12 +26,13 @@ MQ.pdf = (function () {
 
   function nuevo() { const { jsPDF } = window.jspdf; return new jsPDF({ unit: "mm", format: "a4" }); }
 
-  /* Encabezado. Con logo la banda es más alta y los textos se alinean a su
-     centro; sin logo se queda compacta, para no regalar papel. */
+  /* Encabezado en tres bloques apoyados en la misma línea de base: el logo a
+     la izquierda, al centro qué documento es, y a la derecha su número y
+     fecha. El nombre de la empresa solo aparece si no está ya en el logo.
+     Sin logo la banda se queda compacta, para no regalar papel. */
   function hoja(doc, empresa, titulo, numero) {
-    let x = M, y1 = M + 4, y2 = M + 9.5, raya = M + 17;
-    /* un logo que ya trae el nombre no necesita que lo escribamos al lado */
-    const repiteNombre = logoPdf && empresa.logoConNombre;
+    const cx = ANCHO / 2;
+    let base = M + 11;
 
     if (logoPdf) {
       const ratio = logoPdf.w / logoPdf.h;
@@ -39,28 +40,29 @@ MQ.pdf = (function () {
       if (w > ANCHO_LOGO) { w = ANCHO_LOGO; h = w / ratio; }
       const arriba = M - 2;
       doc.addImage(logoPdf.data, "PNG", M, arriba, w, h, "logo", "SLOW");
-      x = M + w + 7;
-      /* el texto de al lado se apoya en el borde inferior del logo */
-      const base = arriba + h;
-      y2 = base;                      // los datos, la última línea
-      y1 = repiteNombre ? base : base - 5.8;
-      raya = base + 4.5;
+      base = arriba + h;
     }
 
-    doc.setTextColor.apply(doc, NEGRO);
-    if (!repiteNombre) {
-      doc.setFont("helvetica", "bold").setFontSize(15);
-      doc.text(empresa.nombre || "Taller", x, y1);
+    const nombre = empresa.nombre || "Taller";
+    if (!logoPdf) {
+      doc.setFont("helvetica", "bold").setFontSize(15).setTextColor.apply(doc, NEGRO);
+      doc.text(nombre, M, base);
+    } else if (!empresa.logoConNombre) {
+      doc.setFont("helvetica", "bold").setFontSize(10).setTextColor.apply(doc, GRIS);
+      doc.text(nombre, cx, base - 13, { align: "center" });
     }
+
+    doc.setFont("helvetica", "bold").setFontSize(13.5).setTextColor.apply(doc, NEGRO);
+    doc.text(titulo, cx, base - 6.5, { align: "center" });
+
     doc.setFont("helvetica", "normal").setFontSize(8.5).setTextColor.apply(doc, GRIS);
-    const datos = [empresa.rut && "RUT " + empresa.rut, empresa.direccion, empresa.telefono, empresa.email].filter(Boolean);
-    doc.text(datos.join("  ·  "), x, y2);
+    const datos = [empresa.rut && "RUT " + empresa.rut, empresa.direccion, empresa.telefono, empresa.email].filter(Boolean).join("  ·  ");
+    if (datos) doc.text(datos, cx, base, { align: "center" });
 
-    doc.setFont("helvetica", "bold").setFontSize(10.5).setTextColor.apply(doc, NEGRO);
-    doc.text(titulo, ANCHO - M, y1, { align: "right" });
-    doc.setFont("helvetica", "normal").setFontSize(9).setTextColor.apply(doc, GRIS);
-    doc.text("N° " + (numero || "—") + "   ·   " + fecha(), ANCHO - M, y2, { align: "right" });
+    doc.setFontSize(9);
+    doc.text("N° " + (numero || "—") + "   ·   " + fecha(), ANCHO - M, base, { align: "right" });
 
+    const raya = base + 4.5;
     doc.setDrawColor.apply(doc, LINEA).setLineWidth(0.3);
     doc.line(M, raya, ANCHO - M, raya);
     return raya + 8;
