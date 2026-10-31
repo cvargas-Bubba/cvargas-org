@@ -342,31 +342,74 @@ MQ.croquis = (function () {
       return f;
     }
 
-    /* Cuánto ancho de lienzo pide la pantalla. Solo se mira estando a pantalla
-       completa, que es donde el alto del lienzo lo fija el layout; en el panel
-       el alto sale de la proporción del propio dibujo, así que mirarlo haría
-       crecer el ancho sin parar. */
-    function pedidoPorPantalla() {
-      if (!cont.closest(".croquis-pleno")) return W;
+    /* ---------- encuadre ----------
+       A pantalla completa no se muestra todo el lienzo sino una ventana
+       puesta sobre el dibujo: de nada sirve ganar espacio si el mueble se ve
+       igual de chico. La ventana se guarda como centro y ancho, y el alto
+       sale de la forma del contenedor, así que aguanta que cambie la
+       ventana del navegador sin deformar nada. */
+    const MARGEN = 40;     // aire alrededor del dibujo, en unidades
+    const MIN_VENTANA = 400;
+    let vp = null;
+
+    const razon = () => {
       const b = cont.getBoundingClientRect();
-      return b.height > 0 ? Math.round((b.width / b.height) * H) : W;
+      return b.height > 0 ? b.width / b.height : W / H;
+    };
+    const ventana = () => {
+      if (!vp) return null;
+      const alto = vp.w / razon();
+      return { x: vp.cx - vp.w / 2, y: vp.cy - alto / 2, w: vp.w, h: alto };
+    };
+
+    function contenido(vista) {
+      const os = (vista && vista.objetos) || [];
+      if (!os.length) return null;
+      let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+      os.forEach((o) => {
+        const b = caja(o);
+        x1 = Math.min(x1, b.x1); y1 = Math.min(y1, b.y1);
+        x2 = Math.max(x2, b.x2); y2 = Math.max(y2, b.y2);
+      });
+      return { x1, y1, x2, y2 };
+    }
+
+    function encuadrar() {
+      const b = contenido(leer().vista);
+      const r = razon();
+      if (!b) { vp = { cx: W / 2, cy: H / 2, w: W }; return; }
+      const an = b.x2 - b.x1 + MARGEN * 2, al = b.y2 - b.y1 + MARGEN * 2;
+      vp = { cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, w: Math.max(MIN_VENTANA, an, al * r) };
+    }
+
+    /* si el dibujo se salió de la ventana, se vuelve a encuadrar: lo que se
+       acaba de dibujar tiene que verse */
+    function cabe() {
+      const v = ventana(), b = contenido(leer().vista);
+      if (!v || !b) return;
+      if (b.x1 < v.x || b.y1 < v.y || b.x2 > v.x + v.w || b.y2 > v.y + v.h) encuadrar();
     }
 
     /* El <svg> se crea una sola vez y después solo cambia su contenido */
     let lienzo = null, ancho = W;
     function pintar() {
       const c = leer();
-      ancho = anchoDe(c.vista, pedidoPorPantalla());
+      if (vp && !arrastre && !trazando && !mano && !cadena) cabe();
+      const v = ventana();
+      ancho = anchoDe(c.vista, v ? Math.ceil(v.x + v.w) : W);
       const fig = figura(c.croquis, c.vista, { grilla: true, w: ancho, sel, hover, nombreMat, previas: previas() });
       if (!lienzo || !cont.contains(lienzo)) {
         cont.innerHTML = MQ.draw.svg(fig, "Croquis");
         lienzo = cont.querySelector("svg");
       } else {
-        /* el <svg> sobrevive entre repintados: su viewBox hay que actualizarlo
-           a mano cuando el lienzo se ensancha */
-        lienzo.setAttribute("viewBox", "0 0 " + fig.w + " " + fig.h);
         lienzo.innerHTML = MQ.draw.formas(fig);
       }
+      /* el <svg> sobrevive entre repintados: el viewBox se pone acá, sea la
+         ventana del encuadre o el lienzo entero */
+      const d1 = (x) => Math.round(x * 10) / 10;
+      lienzo.setAttribute("viewBox", v
+        ? [d1(v.x), d1(v.y), d1(v.w), d1(v.h)].join(" ")
+        : "0 0 " + fig.w + " " + fig.h);
       cont.classList.toggle("modo-dibujo", esDibujo());
       cont.classList.toggle("sobre", !esDibujo() && !!hover);
       cont.classList.toggle("moviendo", !!arrastre);
@@ -537,7 +580,14 @@ MQ.croquis = (function () {
     return {
       pintar,
       /* al cambiar de vista o de partida se limpia lo que estaba en curso */
-      reiniciar() { cadena = null; mano = null; trazando = null; sel = null; hover = null; historia.length = 0; pintar(); },
+      reiniciar() {
+        cadena = null; mano = null; trazando = null; sel = null; hover = null; historia.length = 0;
+        if (vp) encuadrar();
+        pintar();
+      },
+      /* a pantalla completa la ventana se pone sobre el dibujo, para que el
+         mueble se vea grande; al salir se vuelve a ver el lienzo entero */
+      encuadre(on) { if (on) encuadrar(); else vp = null; pintar(); },
       /* ---- material de la figura seleccionada ---- */
       seleccionado() {
         const o = sel && objetos().find((x) => x.id === sel);

@@ -94,8 +94,8 @@
     $("crPleno").textContent = on ? "Salir de pantalla completa" : "Pantalla completa";
     $("crPleno").setAttribute("aria-pressed", on ? "true" : "false");
     document.body.style.overflow = on ? "hidden" : "";
-    /* el lienzo se ensancha para ocupar la ventana, así que hay que redibujar */
-    if (croquis && partida()) croquis.pintar();
+    /* a pantalla completa el dibujo se encuadra para que se vea grande */
+    if (croquis && partida()) croquis.encuadre(on);
   }
 
   function montarCroquis() {
@@ -538,7 +538,7 @@
     $("crSnap").addEventListener("change", () => croquis.ajuste($("crSnap").checked));
     $("crPleno").addEventListener("click", () => pleno());
     window.addEventListener("resize", () => {
-      if ($("subCroquis").classList.contains("croquis-pleno") && croquis && partida()) croquis.pintar();
+      if ($("subCroquis").classList.contains("croquis-pleno") && croquis && partida()) croquis.encuadre(true);
     });
     $("crMedida").addEventListener("click", () => {
       if (!croquis.editarSeleccion()) MQ.toast("Selecciona una figura del croquis.");
