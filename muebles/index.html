@@ -88,9 +88,10 @@
               <label for="crEscala">Un cuadro mide</label>
               <div class="unit" data-unit="mm"><input class="input" id="crEscala" inputmode="numeric" value="100"></div>
             </div>
-            <label class="check"><input type="checkbox" id="crSnap" checked><span>Ajustar a la grilla</span></label>
+            <label class="check"><input type="checkbox" id="crSnap" checked><span>Ajustar de a 10 mm</span></label>
             <label class="check"><input type="checkbox" id="crAcotar" checked><span>Acotar figuras</span></label>
             <div class="croquis-acc">
+              <button class="btn btn-ghost btn-sm" id="crPleno" aria-pressed="false">Pantalla completa</button>
               <button class="btn btn-ghost btn-sm" id="crUndo">Deshacer</button>
               <button class="btn btn-ghost btn-sm" id="crDel">Borrar</button>
               <button class="btn btn-ghost btn-sm" id="crClear">Limpiar vista</button>
@@ -102,6 +103,7 @@
             <select class="select" id="crMat" aria-label="Material de la figura"></select>
             <div class="unit" data-unit="pzas"><input class="input" id="crPiezas" inputmode="numeric" value="1" aria-label="Piezas iguales"></div>
             <span class="mat-calc mono" id="crMatCalc"></span>
+            <button class="btn btn-ghost btn-sm" id="crMedida">Cambiar medida</button>
           </div>
 
           <p class="hint" id="crAyuda"></p>

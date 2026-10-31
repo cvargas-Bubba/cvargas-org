@@ -73,7 +73,7 @@
   }
 
   const AYUDA = {
-    sel: "Haz clic en un trazo para seleccionarlo y arrástralo. Doble clic edita el texto de una cota o un rótulo. Con uno seleccionado puedes asignarle material.",
+    sel: "Haz clic en un trazo para seleccionarlo y arrástralo. Doble clic sobre una figura te deja escribirle la medida exacta, y sobre una cota o un rótulo, su texto. Con uno seleccionado puedes asignarle material.",
     lapiz: "Dibuja arrastrando, como con un lápiz. No se ajusta a la grilla.",
     linea: "Arrastra para dibujar la línea.",
     rect: "Arrastra para dibujar el rectángulo.",
@@ -82,6 +82,16 @@
     texto: "Haz clic donde quieras el rótulo.",
     cota: "Arrastra de un extremo al otro. La medida se calcula sola, y con doble clic la escribes tú."
   };
+
+  /* Dibujar en el panel de la izquierda queda chico: a pantalla completa la
+     grilla crece y se puede trabajar el croquis con detalle. */
+  function pleno(v) {
+    const on = v === undefined ? !$("subCroquis").classList.contains("croquis-pleno") : !!v;
+    $("subCroquis").classList.toggle("croquis-pleno", on);
+    $("crPleno").textContent = on ? "Salir de pantalla completa" : "Pantalla completa";
+    $("crPleno").setAttribute("aria-pressed", on ? "true" : "false");
+    document.body.style.overflow = on ? "hidden" : "";
+  }
 
   function montarCroquis() {
     croquis = MQ.croquis.montar(
@@ -396,6 +406,7 @@
 
   /* ================= NAVEGACIÓN ================= */
   function verVista(v) {
+    pleno(false);
     document.querySelectorAll(".view").forEach((el) => { el.hidden = el.id !== "view-" + v; });
     document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === v)));
     if (v === "historial") pintarHistorial();
@@ -410,6 +421,7 @@
     document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => verVista(b.dataset.view)));
     document.querySelectorAll(".subtab").forEach((b) => b.addEventListener("click", () => {
       document.querySelectorAll(".subtab").forEach((x) => x.classList.toggle("on", x === b));
+      if (b.dataset.sub !== "croquis") pleno(false);
       $("subCroquis").hidden = b.dataset.sub !== "croquis";
       $("subMateriales").hidden = b.dataset.sub !== "materiales";
       if (b.dataset.sub === "croquis" && croquis && partida()) croquis.pintar();
@@ -519,6 +531,10 @@
       croquis.pintar(); guardarBorrador();
     });
     $("crSnap").addEventListener("change", () => croquis.ajuste($("crSnap").checked));
+    $("crPleno").addEventListener("click", () => pleno());
+    $("crMedida").addEventListener("click", () => {
+      if (!croquis.editarSeleccion()) MQ.toast("Selecciona una figura del croquis.");
+    });
     $("crUndo").addEventListener("click", () => { if (!croquis.deshacer()) MQ.toast("No hay nada que deshacer."); });
     $("crDel").addEventListener("click", () => { if (!croquis.borrar()) MQ.toast("Selecciona algo del croquis para borrarlo."); });
     $("crClear").addEventListener("click", () => {
@@ -531,7 +547,8 @@
     document.addEventListener("keydown", (ev) => {
       if ($("view-cotizar").hidden || $("subCroquis").hidden || !croquis) return;
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;
-      if ((ev.key === "Enter" || ev.key === "Escape") && croquis.enCadena()) { ev.preventDefault(); croquis.cerrarCadena(); }
+      if ((ev.key === "Enter" || ev.key === "Escape") && croquis.enCadena()) { ev.preventDefault(); croquis.cerrarCadena(); return; }
+      if (ev.key === "Escape" && $("subCroquis").classList.contains("croquis-pleno")) { ev.preventDefault(); pleno(false); return; }
       if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); croquis.borrar(); }
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") { ev.preventDefault(); croquis.deshacer(); }
     });

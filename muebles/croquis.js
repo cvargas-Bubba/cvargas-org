@@ -10,7 +10,7 @@ window.MQ = window.MQ || {};
 MQ.croquis = (function () {
   const W = 1200, H = 800;   // unidades del lienzo
   const CELDA = 20;          // lado de un cuadro de la grilla
-  const PASO = CELDA / 2;    // a esto se ajustan los puntos
+  const PASO_MM = 10;        // el dibujo se ajusta de a un centímetro real
   const MIN = 6;             // trazos más cortos que esto se descartan
   const CERCA = 12;          // para cerrar una polilínea sobre su primer punto
   const TOLERANCIA = 10;     // cuánto se puede errar el clic sobre un trazo
@@ -20,7 +20,9 @@ MQ.croquis = (function () {
   const MIN_W = 42, MIN_H = 13;
 
   const mmPorUnidad = (c) => MQ.num(c.escala, 100) / CELDA;
-  const ajustar = (v, libre) => (libre ? Math.round(v) : Math.round(v / PASO) * PASO);
+  /* El ajuste se calcula en milímetros y no en cuadros de la grilla: así la
+     medida que va quedando sube de a 10 mm sea cual sea la escala. */
+  const ajustar = (v, paso) => (paso ? Math.round((Math.round(v / paso) * paso) * 100) / 100 : Math.round(v));
   const dentro = (v, max) => Math.max(0, Math.min(max, v));
   const largo = (o) => Math.hypot(o.x2 - o.x1, o.y2 - o.y1);
 
@@ -117,6 +119,41 @@ MQ.croquis = (function () {
     const e = (o.etiqueta || "").trim();
     if (!e) return Math.round(largo(o) * mm) + " mm";
     return /^[\d.,]+$/.test(e) ? e + " mm" : e;
+  }
+
+  /* ---------- medida escrita a mano ----------
+     Dibujar a ojo no llega a 1012 mm. Escribiendo el número la figura se
+     estira desde su esquina superior izquierda, o desde su primer punto, de
+     manera que lo que ya estaba apoyado ahí no se mueve. */
+  function medidaDe(o, mm) {
+    if (o.t === "rect" || o.t === "rombo") return Math.round(Math.abs(o.w) * mm) + " × " + Math.round(Math.abs(o.h) * mm);
+    return String(Math.round(largoMm(o, mm)));
+  }
+
+  const numerosDe = (s) => (String(s).match(/\d+(?:[.,]\d+)?/g) || [])
+    .map((x) => parseFloat(x.replace(",", "."))).filter((v) => v > 0);
+
+  function aplicarMedida(o, nums, mm) {
+    if (!nums.length) return false;
+    if (o.t === "rect" || o.t === "rombo") {
+      const x = Math.min(o.x, o.x + o.w), y = Math.min(o.y, o.y + o.h);
+      const an = nums[0] / mm;
+      const al = (nums.length > 1 ? nums[1] / mm : Math.abs(o.h));
+      o.x = x; o.y = y;
+      o.w = Math.min(an, W - x); o.h = Math.min(al, H - y);
+      return true;
+    }
+    const actual = largoMm(o, mm);
+    if (actual <= 0) return false;
+    const k = nums[0] / actual;
+    if (o.t === "poli" || o.t === "lapiz") {
+      const a = { x: o.pts[0].x, y: o.pts[0].y };
+      o.pts.forEach((p) => { p.x = a.x + (p.x - a.x) * k; p.y = a.y + (p.y - a.y) * k; });
+    } else {
+      o.x2 = o.x1 + (o.x2 - o.x1) * k;
+      o.y2 = o.y1 + (o.y2 - o.y1) * k;
+    }
+    return true;
   }
 
   /* ---------- dibujo ---------- */
@@ -285,25 +322,38 @@ MQ.croquis = (function () {
       p.x = ev.clientX; p.y = ev.clientY;
       const m = svg.getScreenCTM();
       const q = m ? p.matrixTransform(m.inverse()) : { x: 0, y: 0 };
-      const l = sinAjuste || libre;
-      return { x: dentro(ajustar(q.x, l), W), y: dentro(ajustar(q.y, l), H) };
+      const paso = sinAjuste || libre ? 0 : PASO_MM / mmPorUnidad(leer().croquis);
+      return { x: dentro(ajustar(q.x, paso), W), y: dentro(ajustar(q.y, paso), H) };
     }
 
-    function editarTexto(o) {
+    /* La cota es una anotación: se le escribe el texto. Cualquier otra figura
+       es el mueble mismo, así que lo que se escribe es su medida y la figura
+       se estira hasta ahí. */
+    function editar(o) {
       const c = leer();
+      const mm = mmPorUnidad(c.croquis);
       if (o.t === "cota") {
-        const actual = (o.etiqueta || "").trim() || String(Math.round(largo(o) * mmPorUnidad(c.croquis)));
+        const actual = (o.etiqueta || "").trim() || String(Math.round(largo(o) * mm));
         const v = prompt("Medida de la cota.\nDéjalo vacío para que vuelva a calcularse sola.", actual);
         if (v === null) return;
         guardar(); o.etiqueta = v.trim();
+        sel = null;
       } else if (o.t === "texto") {
         const v = prompt("Texto del rótulo:", o.s);
         if (v === null) return;
         guardar();
         if (!v.trim()) c.vista.objetos = c.vista.objetos.filter((x) => x.id !== o.id);
         else o.s = v.trim();
-      } else return;
-      sel = null; pintar(); alCambiar();
+        sel = null;
+      } else {
+        const caja = o.t === "rect" || o.t === "rombo";
+        const v = prompt(caja ? "Medida en mm, ancho × alto:" : "Largo en mm:", medidaDe(o, mm));
+        if (v === null) return;
+        const nums = numerosDe(v);
+        if (!nums.length) return;
+        guardar(); aplicarMedida(o, nums, mm);
+      }
+      pintar(); alCambiar();
     }
 
     function terminarCadena() {
@@ -330,7 +380,7 @@ MQ.croquis = (function () {
 
       if (herramienta === "sel") {
         const o = objetoEn(objetos(), p.x, p.y);
-        if (doble && o) { editarTexto(o); return; }
+        if (doble && o) { editar(o); return; }
         sel = o ? o.id : null;
         if (o) { guardar(); arrastre = { id: o.id, x: p.x, y: p.y }; }
         pintar(); alCambiar();
@@ -393,7 +443,7 @@ MQ.croquis = (function () {
       if (herramienta !== "sel") return;
       const p = punto(ev);
       const o = objetoEn(objetos(), p.x, p.y);
-      if (o) { ultimoDoble = Date.now(); editarTexto(o); }
+      if (o) { ultimoDoble = Date.now(); editar(o); }
     });
 
     function soltar() {
@@ -452,8 +502,8 @@ MQ.croquis = (function () {
       cerrarCadena() { if (cadena) terminarCadena(); },
       editarSeleccion() {
         const o = sel && objetos().find((x) => x.id === sel);
-        if (!o || (o.t !== "cota" && o.t !== "texto")) return false;
-        editarTexto(o);
+        if (!o) return false;
+        editar(o);
         return true;
       },
       borrar() {

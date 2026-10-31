@@ -144,6 +144,14 @@ img, svg { max-width: 100%; }
 .croquis-lienzo svg .cota { stroke: var(--acento); stroke-width: 1.4; }
 .croquis-lienzo svg .dm { fill: var(--acento); font: 500 13px var(--mono); text-anchor: middle; }
 
+/* Pantalla completa: el croquis se come la ventana y la grilla crece todo lo
+   que da. El <svg> pasa a altura fija para que el dibujo se centre dentro de
+   lo que sobra, en vez de estirarse y perder la proporción. */
+.croquis-pleno { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column; gap: 0; overflow: auto; padding: 16px 20px 20px; }
+.croquis-pleno .croquis-lienzo { flex: 1 1 auto; min-height: 320px; }
+.croquis-pleno .croquis-lienzo svg { width: 100%; height: 100%; }
+.croquis-pleno .hint { margin-bottom: 8px; }
+
 /* ---------- materiales de la partida ---------- */
 .lin-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .lin { display: grid; grid-template-columns: minmax(0, 1fr) 128px 112px 92px auto; gap: 8px; align-items: center; margin-bottom: 8px; }
