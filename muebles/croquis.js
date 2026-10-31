@@ -8,7 +8,8 @@
 window.MQ = window.MQ || {};
 
 MQ.croquis = (function () {
-  const W = 1200, H = 800;   // unidades del lienzo
+  const W = 1200, H = 800;   // unidades del lienzo (el ancho puede crecer)
+  const MAX_W = 2600;        // hasta acá, para que la grilla no se vuelva polvo
   const CELDA = 20;          // lado de un cuadro de la grilla
   const PASO_MM = 10;        // el dibujo se ajusta de a un centímetro real
   const MIN = 6;             // trazos más cortos que esto se descartan
@@ -44,11 +45,11 @@ MQ.croquis = (function () {
   /* ---------- largo de una figura, en mm ----------
      Es lo que permite que el croquis entregue la cantidad de material: un
      trazo asignado a una escuadría es una pieza de ese largo. En las figuras
-     de caja se toma el lado mayor, que es como se pide el corte. */
+     cerradas se recorre todo el contorno, porque el marco de un mueble lleva
+     material en los cuatro lados: 1000 × 500 son 3 metros de perfil. */
   function largoMm(o, mm) {
     if (!o) return 0;
     if (o.t === "texto") return 0;
-    if (o.t === "rect" || o.t === "rombo") return Math.max(Math.abs(o.w), Math.abs(o.h)) * mm;
     const v = vertices(o);
     let d = 0;
     const n = cerrada(o) ? v.length : v.length - 1;
@@ -70,6 +71,19 @@ MQ.croquis = (function () {
       x1: Math.min.apply(null, v.map((p) => p.x)), y1: Math.min.apply(null, v.map((p) => p.y)),
       x2: Math.max.apply(null, v.map((p) => p.x)), y2: Math.max.apply(null, v.map((p) => p.y))
     };
+  }
+
+  /* Ancho del lienzo. Crece para acompañar la forma de la pantalla —en
+     pantalla completa sobra ancho y falta alto— y, una vez que se dibujó
+     algo allá a la derecha, se queda grande: así el dibujo nunca queda
+     fuera del cuadro al volver al panel angosto ni al pasar al PDF. */
+  function anchoDe(vista, pedido) {
+    let max = Math.max(W, Math.min(MAX_W, MQ.num(pedido, W)));
+    (vista && vista.objetos || []).forEach((o) => {
+      const b = caja(o);
+      if (b.x2 + 40 > max) max = b.x2 + 40;
+    });
+    return Math.min(MAX_W, Math.ceil(max / CELDA) * CELDA);
   }
 
   function distanciaASegmento(px, py, x1, y1, x2, y2) {
@@ -140,7 +154,7 @@ MQ.croquis = (function () {
       const an = nums[0] / mm;
       const al = (nums.length > 1 ? nums[1] / mm : Math.abs(o.h));
       o.x = x; o.y = y;
-      o.w = Math.min(an, W - x); o.h = Math.min(al, H - y);
+      o.w = Math.min(an, MAX_W - x); o.h = Math.min(al, H - y);
       return true;
     }
     const actual = largoMm(o, mm);
@@ -164,9 +178,10 @@ MQ.croquis = (function () {
     const texto = (x, y, s, clase) => formas.push({ t: "texto", x, y, s: String(s), clase, anclaje: "centro" });
     const poli = (pts, cerrado, clase) => formas.push({ t: "poli", pts, cerrado: !!cerrado, clase });
 
+    const an = anchoDe(vista, op.w);
     if (op.grilla) {
-      for (let x = CELDA; x < W; x += CELDA) linea(x, 0, x, H, "grid");
-      for (let y = CELDA; y < H; y += CELDA) linea(0, y, W, y, "grid");
+      for (let x = CELDA; x < an; x += CELDA) linea(x, 0, x, H, "grid");
+      for (let y = CELDA; y < H; y += CELDA) linea(0, y, an, y, "grid");
     }
 
     const mm = mmPorUnidad(croquis);
@@ -232,7 +247,7 @@ MQ.croquis = (function () {
     if (op.hover && op.hover !== op.sel) marco(op.hover, "hover");
     marco(op.sel, "sel");
 
-    return { w: W, h: H, formas };
+    return { w: an, h: H, formas };
   }
 
   const vistaVacia = (v) => !v || !(v.objetos || []).length;
@@ -300,15 +315,29 @@ MQ.croquis = (function () {
       return f;
     }
 
+    /* Cuánto ancho de lienzo pide la pantalla. Solo se mira estando a pantalla
+       completa, que es donde el alto del lienzo lo fija el layout; en el panel
+       el alto sale de la proporción del propio dibujo, así que mirarlo haría
+       crecer el ancho sin parar. */
+    function pedidoPorPantalla() {
+      if (!cont.closest(".croquis-pleno")) return W;
+      const b = cont.getBoundingClientRect();
+      return b.height > 0 ? Math.round((b.width / b.height) * H) : W;
+    }
+
     /* El <svg> se crea una sola vez y después solo cambia su contenido */
-    let lienzo = null;
+    let lienzo = null, ancho = W;
     function pintar() {
       const c = leer();
-      const fig = figura(c.croquis, c.vista, { grilla: true, sel, hover, nombreMat, previas: previas() });
+      ancho = anchoDe(c.vista, pedidoPorPantalla());
+      const fig = figura(c.croquis, c.vista, { grilla: true, w: ancho, sel, hover, nombreMat, previas: previas() });
       if (!lienzo || !cont.contains(lienzo)) {
         cont.innerHTML = MQ.draw.svg(fig, "Croquis");
         lienzo = cont.querySelector("svg");
       } else {
+        /* el <svg> sobrevive entre repintados: su viewBox hay que actualizarlo
+           a mano cuando el lienzo se ensancha */
+        lienzo.setAttribute("viewBox", "0 0 " + fig.w + " " + fig.h);
         lienzo.innerHTML = MQ.draw.formas(fig);
       }
       cont.classList.toggle("modo-dibujo", esDibujo());
@@ -323,7 +352,7 @@ MQ.croquis = (function () {
       const m = svg.getScreenCTM();
       const q = m ? p.matrixTransform(m.inverse()) : { x: 0, y: 0 };
       const paso = sinAjuste || libre ? 0 : PASO_MM / mmPorUnidad(leer().croquis);
-      return { x: dentro(ajustar(q.x, paso), W), y: dentro(ajustar(q.y, paso), H) };
+      return { x: dentro(ajustar(q.x, paso), ancho), y: dentro(ajustar(q.y, paso), H) };
     }
 
     /* La cota es una anotación: se le escribe el texto. Cualquier otra figura
@@ -528,5 +557,5 @@ MQ.croquis = (function () {
     };
   }
 
-  return { figura, montar, vacio, vistaVacia, conDibujo, mmPorUnidad, largoMm, piezasDe, W, H, CELDA };
+  return { figura, montar, vacio, vistaVacia, conDibujo, mmPorUnidad, largoMm, piezasDe, cerrada, W, H, CELDA };
 })();

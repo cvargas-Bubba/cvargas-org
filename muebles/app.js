@@ -67,9 +67,12 @@
     const largo = Math.round(MQ.croquis.largoMm(o, mm));
     const it = o.mat && MQ.calc.item(S.catalogo, o.mat);
     const pz = MQ.croquis.piezasDe(o);
+    /* en una figura cerrada el largo es la suma de los lados: conviene decirlo,
+       porque el número no coincide con ninguna de las medidas que se ven */
+    const q = (MQ.croquis.cerrada(o) ? "contorno " : "") + largo + " mm";
     $("crMatCalc").textContent = it
-      ? largo + " mm × " + pz + " = " + MQ.dec(largo / 1000 * pz, 2) + " m · " + MQ.clp(largo / 1000 * pz * it.precio)
-      : largo + " mm";
+      ? q + " × " + pz + " = " + MQ.dec(largo / 1000 * pz, 2) + " m · " + MQ.clp(largo / 1000 * pz * it.precio)
+      : q;
   }
 
   const AYUDA = {
@@ -91,6 +94,8 @@
     $("crPleno").textContent = on ? "Salir de pantalla completa" : "Pantalla completa";
     $("crPleno").setAttribute("aria-pressed", on ? "true" : "false");
     document.body.style.overflow = on ? "hidden" : "";
+    /* el lienzo se ensancha para ocupar la ventana, así que hay que redibujar */
+    if (croquis && partida()) croquis.pintar();
   }
 
   function montarCroquis() {
@@ -532,6 +537,9 @@
     });
     $("crSnap").addEventListener("change", () => croquis.ajuste($("crSnap").checked));
     $("crPleno").addEventListener("click", () => pleno());
+    window.addEventListener("resize", () => {
+      if ($("subCroquis").classList.contains("croquis-pleno") && croquis && partida()) croquis.pintar();
+    });
     $("crMedida").addEventListener("click", () => {
       if (!croquis.editarSeleccion()) MQ.toast("Selecciona una figura del croquis.");
     });
