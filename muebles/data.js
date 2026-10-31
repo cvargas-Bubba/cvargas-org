@@ -92,6 +92,7 @@ MQ.DEFAULT_CATALOGO = {
 MQ.DEFAULT_EMPRESA = {
   nombre: "Fierro & Veta",
   logo: "",
+  logoConNombre: false,   // el logo ya trae el nombre: no se escribe al lado
   rut: "",
   telefono: "",
   email: "",

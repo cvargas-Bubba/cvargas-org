@@ -22,34 +22,46 @@ MQ.pdf = (function () {
   const COLOR_TEXTO = { acote: [120, 95, 60], mat: [150, 110, 55], rotulo: NEGRO };
 
   let logoPdf = null;
-  const ALTO_LOGO = 14, ANCHO_LOGO = 50;
+  const ALTO_LOGO = 26, ANCHO_LOGO = 70;
 
   function nuevo() { const { jsPDF } = window.jspdf; return new jsPDF({ unit: "mm", format: "a4" }); }
 
+  /* Encabezado. Con logo la banda es más alta y los textos se alinean a su
+     centro; sin logo se queda compacta, para no regalar papel. */
   function hoja(doc, empresa, titulo, numero) {
-    let x = M;
+    let x = M, y1 = M + 4, y2 = M + 9.5, raya = M + 17;
+    /* un logo que ya trae el nombre no necesita que lo escribamos al lado */
+    const repiteNombre = logoPdf && empresa.logoConNombre;
+
     if (logoPdf) {
       const ratio = logoPdf.w / logoPdf.h;
       let h = ALTO_LOGO, w = h * ratio;
       if (w > ANCHO_LOGO) { w = ANCHO_LOGO; h = w / ratio; }
-      doc.addImage(logoPdf.data, "PNG", M, M - 1, w, h, "logo", "SLOW");
-      x = M + w + 6;
+      doc.addImage(logoPdf.data, "PNG", M, M - 2, w, h, "logo", "SLOW");
+      x = M + w + 7;
+      const centro = M - 2 + h / 2;
+      y1 = centro - 2; y2 = centro + 3.5;
+      if (repiteNombre) y2 = centro + 1.5;   // los datos, solos, van al centro
+      raya = M - 2 + h + 4;
     }
+
     doc.setTextColor.apply(doc, NEGRO);
-    doc.setFont("helvetica", "bold").setFontSize(15);
-    doc.text(empresa.nombre || "Taller", x, M + 4);
+    if (!repiteNombre) {
+      doc.setFont("helvetica", "bold").setFontSize(15);
+      doc.text(empresa.nombre || "Taller", x, y1);
+    }
     doc.setFont("helvetica", "normal").setFontSize(8.5).setTextColor.apply(doc, GRIS);
     const datos = [empresa.rut && "RUT " + empresa.rut, empresa.direccion, empresa.telefono, empresa.email].filter(Boolean);
-    doc.text(datos.join("  ·  "), x, M + 9.5);
+    doc.text(datos.join("  ·  "), x, y2);
 
     doc.setFont("helvetica", "bold").setFontSize(10.5).setTextColor.apply(doc, NEGRO);
-    doc.text(titulo, ANCHO - M, M + 4, { align: "right" });
+    doc.text(titulo, ANCHO - M, y1, { align: "right" });
     doc.setFont("helvetica", "normal").setFontSize(9).setTextColor.apply(doc, GRIS);
-    doc.text("N° " + (numero || "—") + "   ·   " + fecha(), ANCHO - M, M + 9.5, { align: "right" });
+    doc.text("N° " + (numero || "—") + "   ·   " + fecha(), ANCHO - M, y2, { align: "right" });
 
     doc.setDrawColor.apply(doc, LINEA).setLineWidth(0.3);
-    doc.line(M, M + 17, ANCHO - M, M + 17);
-    return M + 25;
+    doc.line(M, raya, ANCHO - M, raya);
+    return raya + 8;
   }
 
   function pie(doc) {

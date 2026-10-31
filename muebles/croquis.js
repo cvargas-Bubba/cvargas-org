@@ -224,16 +224,28 @@ MQ.croquis = (function () {
       if (historia.length > 30) historia.shift();
     };
 
+    /* Formas en curso. Mientras se arrastra se muestra la medida en vivo:
+       es lo que permite estirar hasta el valor que uno quiere en lugar de
+       dibujar a ojo y corregir después. Se muestra siempre, aunque el
+       acotado automático esté apagado, porque acá es una ayuda para medir
+       y no una anotación del dibujo. */
     function previas() {
       const f = [];
+      const mm = mmPorUnidad(leer().croquis);
+      const medida = (x, y, s) => f.push({ t: "texto", x, y, s, clase: "previa-dm", anclaje: "centro" });
+
       if (trazando) {
         const t = trazando;
-        if (herramienta === "rect") {
-          f.push({ t: "rect", x: Math.min(t.x1, t.x2), y: Math.min(t.y1, t.y2), w: Math.abs(t.x2 - t.x1), h: Math.abs(t.y2 - t.y1), clase: "previa" });
-        } else if (herramienta === "rombo") {
-          f.push({ t: "poli", pts: vertices({ t: "rombo", x: Math.min(t.x1, t.x2), y: Math.min(t.y1, t.y2), w: Math.abs(t.x2 - t.x1), h: Math.abs(t.y2 - t.y1) }), cerrado: true, clase: "previa" });
+        const an = Math.abs(t.x2 - t.x1), al = Math.abs(t.y2 - t.y1);
+        const x = Math.min(t.x1, t.x2), y = Math.min(t.y1, t.y2);
+        if (herramienta === "rect" || herramienta === "rombo") {
+          if (herramienta === "rect") f.push({ t: "rect", x, y, w: an, h: al, clase: "previa" });
+          else f.push({ t: "poli", pts: vertices({ t: "rombo", x, y, w: an, h: al }), cerrado: true, clase: "previa" });
+          medida(x + an / 2, y + al / 2 + 4, Math.round(an * mm) + " × " + Math.round(al * mm) + " mm");
         } else {
           f.push({ t: "linea", x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2, clase: "previa" });
+          const l = Math.hypot(t.x2 - t.x1, t.y2 - t.y1);
+          medida((t.x1 + t.x2) / 2, (t.y1 + t.y2) / 2 - 9, Math.round(l * mm) + " mm");
         }
       }
       if (mano && mano.length > 1) f.push({ t: "poli", pts: mano, cerrado: false, clase: "lapiz" });
@@ -241,6 +253,12 @@ MQ.croquis = (function () {
         const pts = cursor ? cadena.concat([cursor]) : cadena.slice();
         if (pts.length > 1) f.push({ t: "poli", pts, cerrado: false, clase: "previa" });
         f.push({ t: "circulo", cx: cadena[0].x, cy: cadena[0].y, r: 5, clase: "punto" });
+        /* del multipunto se mide el tramo que se está tirando */
+        if (cursor) {
+          const u = cadena[cadena.length - 1];
+          const l = Math.hypot(cursor.x - u.x, cursor.y - u.y);
+          if (l > 2) medida((u.x + cursor.x) / 2, (u.y + cursor.y) / 2 - 9, Math.round(l * mm) + " mm");
+        }
       }
       return f;
     }

@@ -195,7 +195,7 @@
     $("brandName").textContent = emp.nombre || "Cotizador";
     $("sheetCompany").innerHTML =
       (emp.logo ? `<img class="sheet-logo" src="${esc(emp.logo)}" alt="${esc(emp.nombre || "Logo")}">` : "") +
-      `<div class="sc-n">${esc(emp.nombre || "Mi taller")}</div>` +
+      (emp.logo && emp.logoConNombre ? "" : `<div class="sc-n">${esc(emp.nombre || "Mi taller")}</div>`) +
       `<div class="sc-d">${esc([emp.rut && "RUT " + emp.rut, emp.telefono, emp.email].filter(Boolean).join(" · "))}</div>`;
     $("quoteNo").textContent = "N° " + (quote.numero || S.nextNumero());
     $("quoteDate").textContent = fechaCorta(quote.creado);
@@ -381,6 +381,8 @@
     const src = S.empresa.logo;
     $("eLogoPrev").innerHTML = src ? `<img src="${esc(src)}" alt="Logo de la empresa">` : "";
     $("eLogoDel").hidden = !src;
+    $("eLogoNombreBox").hidden = !src;
+    $("eLogoConNombre").checked = !!S.empresa.logoConNombre;
   }
 
   function pintarEmpresa() {
@@ -739,6 +741,10 @@
         pintarLogo(); MQ.toast("Logo guardado");
       } catch (e) { MQ.toast((e && e.message) || "No se pudo usar esa imagen."); }
     });
+    $("eLogoConNombre").addEventListener("change", () => {
+      S.saveEmpresa(Object.assign(MQ.clone(S.empresa), { logoConNombre: $("eLogoConNombre").checked }));
+      MQ.toast($("eLogoConNombre").checked ? "El nombre no se repetirá junto al logo" : "El nombre vuelve a salir junto al logo");
+    });
     $("eLogoDel").addEventListener("click", () => {
       if (!confirm("¿Quitar el logo?")) return;
       S.saveEmpresa(Object.assign(MQ.clone(S.empresa), { logo: "" }));
@@ -747,7 +753,7 @@
     $("empresaForm").addEventListener("submit", (ev) => {
       ev.preventDefault();
       S.saveEmpresa({
-        logo: S.empresa.logo,
+        logo: S.empresa.logo, logoConNombre: S.empresa.logoConNombre,
         nombre: $("eNombre").value.trim(), rut: $("eRut").value.trim(),
         telefono: $("eTelefono").value.trim(), email: $("eEmail").value.trim(),
         direccion: $("eDireccion").value.trim(),
