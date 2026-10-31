@@ -22,7 +22,7 @@ MQ.pdf = (function () {
   const COLOR_TEXTO = { acote: [120, 95, 60], mat: [150, 110, 55], rotulo: NEGRO };
 
   let logoPdf = null;
-  const ALTO_LOGO = 26, ANCHO_LOGO = 70;
+  const ALTO_LOGO = 32, ANCHO_LOGO = 84;
 
   function nuevo() { const { jsPDF } = window.jspdf; return new jsPDF({ unit: "mm", format: "a4" }); }
 
@@ -37,12 +37,14 @@ MQ.pdf = (function () {
       const ratio = logoPdf.w / logoPdf.h;
       let h = ALTO_LOGO, w = h * ratio;
       if (w > ANCHO_LOGO) { w = ANCHO_LOGO; h = w / ratio; }
-      doc.addImage(logoPdf.data, "PNG", M, M - 2, w, h, "logo", "SLOW");
+      const arriba = M - 2;
+      doc.addImage(logoPdf.data, "PNG", M, arriba, w, h, "logo", "SLOW");
       x = M + w + 7;
-      const centro = M - 2 + h / 2;
-      y1 = centro - 2; y2 = centro + 3.5;
-      if (repiteNombre) y2 = centro + 1.5;   // los datos, solos, van al centro
-      raya = M - 2 + h + 4;
+      /* el texto de al lado se apoya en el borde inferior del logo */
+      const base = arriba + h;
+      y2 = base;                      // los datos, la última línea
+      y1 = repiteNombre ? base : base - 5.8;
+      raya = base + 4.5;
     }
 
     doc.setTextColor.apply(doc, NEGRO);
