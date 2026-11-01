@@ -91,7 +91,7 @@
   }
 
   const AYUDA = {
-    sel: "Haz clic en un trazo para seleccionarlo y arrástralo. Para varios a la vez, arrastra un recuadro sobre ellos o súmalos con Ctrl o Shift: el material se asigna a todos juntos. Doble clic te deja escribir la medida exacta, o el texto de una cota o un rótulo.",
+    sel: "Haz clic en un trazo para seleccionarlo y arrástralo. Para varios a la vez, arrastra un recuadro sobre ellos o súmalos con Ctrl o Shift: el material se asigna a todos juntos. Doble clic te deja escribir la medida exacta, o el texto de una cota o un rótulo. Duplicar (Ctrl+D) repite lo seleccionado con su material; Ctrl+C y Ctrl+V lo llevan a otra vista.",
     lapiz: "Dibuja arrastrando, como con un lápiz. No se ajusta a la grilla.",
     linea: "Arrastra para dibujar la línea.",
     rect: "Arrastra para dibujar el rectángulo.",
@@ -766,6 +766,12 @@
     $("crMedida").addEventListener("click", () => {
       if (!croquis.editarSeleccion()) MQ.toast("Selecciona una figura del croquis.");
     });
+    $("crCopiar").addEventListener("click", () => {
+      const n = croquis.duplicar();
+      if (!n) return MQ.toast("Selecciona lo que quieras duplicar.");
+      MQ.toast(n === 1 ? "Figura duplicada" : n + " figuras duplicadas");
+      pintarBarraMaterial();
+    });
     $("crUndo").addEventListener("click", () => { if (!croquis.deshacer()) MQ.toast("No hay nada que deshacer."); });
     $("crDel").addEventListener("click", () => { if (!croquis.borrar()) MQ.toast("Selecciona algo del croquis para borrarlo."); });
     $("crClear").addEventListener("click", () => {
@@ -784,7 +790,27 @@
       if ((ev.key === "Enter" || ev.key === "Escape") && croquis.enCadena()) { ev.preventDefault(); croquis.cerrarCadena(); return; }
       if (ev.key === "Escape" && $("subCroquis").classList.contains("croquis-pleno")) { ev.preventDefault(); pleno(false); return; }
       if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); croquis.borrar(); }
-      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") { ev.preventDefault(); croquis.deshacer(); }
+      if (!(ev.ctrlKey || ev.metaKey)) return;
+      const k = ev.key.toLowerCase();
+      if (k === "z") { ev.preventDefault(); croquis.deshacer(); }
+      if (k === "c") {
+        const n = croquis.copiar();
+        if (!n) return;
+        ev.preventDefault();
+        MQ.toast(n === 1 ? "Figura copiada" : n + " figuras copiadas");
+      }
+      if (k === "v") {
+        const n = croquis.pegar();
+        if (!n) return;
+        ev.preventDefault(); pintarBarraMaterial();
+        MQ.toast(n === 1 ? "Figura pegada" : n + " figuras pegadas");
+      }
+      if (k === "d") {
+        const n = croquis.duplicar();
+        ev.preventDefault();
+        if (n) pintarBarraMaterial();
+        MQ.toast(n ? (n === 1 ? "Figura duplicada" : n + " figuras duplicadas") : "Selecciona lo que quieras duplicar.");
+      }
     });
 
     /* ---- materiales de la partida ---- */

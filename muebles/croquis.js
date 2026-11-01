@@ -297,6 +297,7 @@ MQ.croquis = (function () {
     let cadena = null;      // puntos de la polilínea en curso
     let mano = null;        // puntos del trazo a mano alzada en curso
     let cursor = null;
+    let porta = null;       // lo copiado, para pegarlo acá o en otra vista
     let anterior = null, ultimoDoble = 0;
     const historia = [];
 
@@ -485,6 +486,24 @@ MQ.croquis = (function () {
       pintar(); alCambiar();
     }
 
+    /* La copia cae corrida un cuadro, para que se vea que son dos y se pueda
+       agarrar la de arriba; queda seleccionada, lista para arrastrar a su
+       lugar o para asignarle otro material. */
+    function clonar(lista) {
+      guardar();
+      const nuevos = lista.map((o) => {
+        const c = JSON.parse(JSON.stringify(o));
+        c.id = MQ.uid();
+        mover(c, CELDA, CELDA);
+        return c;
+      });
+      nuevos.forEach((o) => objetos().push(o));
+      sel = nuevos.map((o) => o.id);
+      hover = null;
+      pintar(); alCambiar();
+      return nuevos.length;
+    }
+
     function terminarCadena() {
       const pts = (cadena || []).filter((p, i, a) => i === 0 || p.x !== a[i - 1].x || p.y !== a[i - 1].y);
       cadena = null; cursor = null;
@@ -671,6 +690,22 @@ MQ.croquis = (function () {
         pintar(); alCambiar();
         return true;
       },
+      /* ---- copiar y pegar ----
+         Un mueble repite piezas: las patas, los travesaños, los frentes de
+         los cajones. Copiar se lleva también el material y las piezas
+         asignadas, que es lo que ahorra el trabajo de verdad. */
+      copiar() {
+        const os = elegidos();
+        if (!os.length) return 0;
+        porta = os.map((o) => JSON.parse(JSON.stringify(o)));
+        return porta.length;
+      },
+      pegar() { return porta && porta.length ? clonar(porta) : 0; },
+      duplicar() {
+        const os = elegidos();
+        return os.length ? clonar(os) : 0;
+      },
+      hayCopia: () => !!(porta && porta.length),
       herramienta(h) { if (cadena) terminarCadena(); herramienta = h; sel = []; hover = null; pintar(); },
       ajuste(v) { libre = !v; },
       enCadena: () => !!cadena,
