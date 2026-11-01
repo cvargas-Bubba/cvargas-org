@@ -44,12 +44,27 @@ MQ.croquis = (function () {
 
   /* ---------- largo de una figura, en mm ----------
      Es lo que permite que el croquis entregue la cantidad de material: un
-     trazo asignado a una escuadría es una pieza de ese largo. En las figuras
-     cerradas se recorre todo el contorno, porque el marco de un mueble lleva
-     material en los cuatro lados: 1000 × 500 son 3 metros de perfil. */
-  function largoMm(o, mm) {
+     trazo asignado a una escuadría es una pieza de ese largo.
+
+     En una figura cerrada hay dos lecturas y las decide el material, no el
+     dibujo: en fierro el rectángulo es un marco y se recorre el contorno
+     —1000 × 500 son 3 metros de perfil—; en madera es una tabla y se cuenta
+     su lado mayor, porque el otro es el ancho de la pieza. */
+  const ladoMayor = (o) => {
+    if (o.t === "rect" || o.t === "rombo") return Math.max(Math.abs(o.w), Math.abs(o.h));
+    const v = vertices(o);
+    let m = 0;
+    for (let i = 0; i < v.length; i++) {
+      const a = v[i], b = v[(i + 1) % v.length];
+      m = Math.max(m, Math.hypot(b.x - a.x, b.y - a.y));
+    }
+    return m;
+  };
+
+  function largoMm(o, mm, modo) {
     if (!o) return 0;
     if (o.t === "texto") return 0;
+    if (modo === "largo" && cerrada(o)) return ladoMayor(o) * mm;
     const v = vertices(o);
     let d = 0;
     const n = cerrada(o) ? v.length : v.length - 1;
@@ -65,11 +80,12 @@ MQ.croquis = (function () {
      Para comprar basta el total, pero en el banco se corta pieza por pieza:
      un marco de 1000 × 500 son dos de 1000 y dos de 500. Del trazo a mano
      alzada no sale ningún corte útil, así que va entero. */
-  function ladosMm(o, mm) {
+  function ladosMm(o, mm, modo) {
     const out = [];
     if (!o || o.t === "texto") return out;
-    if (o.t === "lapiz") {
-      const l = Math.round(largoMm(o, mm));
+    if (o.t === "lapiz" || (modo === "largo" && cerrada(o))) {
+      /* la tabla es una sola pieza: su contorno no son cortes */
+      const l = Math.round(largoMm(o, mm, modo));
       return l > 0 ? [{ largo: l, piezas: 1 }] : out;
     }
     const sumar = (v) => {
@@ -727,6 +743,15 @@ MQ.croquis = (function () {
         sel = objetos().filter((o) => o.mat === id).map((o) => o.id);
         hover = null; pintar(); alCambiar();
         return sel.length;
+      },
+      /* cómo se cuenta una figura cerrada, cuando el material no acierta */
+      corte(modo) {
+        const os = this.seleccionados().filter((o) => cerrada(o));
+        if (!os.length) return false;
+        guardar();
+        os.forEach((o) => { if (modo) o.corte = modo; else delete o.corte; });
+        pintar(); alCambiar();
+        return true;
       },
       herramienta(h) { if (cadena) terminarCadena(); herramienta = h; sel = []; hover = null; pintar(); },
       ajuste(v) { libre = !v; },

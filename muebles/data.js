@@ -28,8 +28,12 @@ MQ.UNIDADES = {
   global: { nombre: "global", largo: "monto fijo" }
 };
 
+/* `corteLargo`: en una figura cerrada, este material se cuenta por el lado
+   mayor y no por el contorno. Un rectángulo de 1000 × 300 es un marco de
+   fierro —2,6 m de perfil— pero es una tabla de 1 m de largo: el 300 es el
+   ancho de la madera, no otro corte. */
 MQ.CATEGORIAS = [
-  { id: "madera", nombre: "Madera dimensionada", escuadria: true },
+  { id: "madera", nombre: "Madera dimensionada", escuadria: true, corteLargo: true },
   { id: "perfil", nombre: "Perfiles de fierro" },
   { id: "tablero", nombre: "Tableros" },
   { id: "herraje", nombre: "Herrajes" },
@@ -37,6 +41,7 @@ MQ.CATEGORIAS = [
   { id: "mano", nombre: "Mano de obra" }
 ];
 MQ.categoria = (id) => MQ.CATEGORIAS.find((c) => c.id === id) || MQ.CATEGORIAS[0];
+MQ.CORTES = { contorno: "Contorno: los lados", largo: "Largo: el lado mayor" };
 
 /* ---------- catálogo por defecto ----------
    Valores de referencia: hay que reemplazarlos por los propios.

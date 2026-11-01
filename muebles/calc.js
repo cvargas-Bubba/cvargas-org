@@ -17,6 +17,12 @@ MQ.calc = (function () {
     return Math.max(0, MQ.num(l.cant, 0));
   }
 
+  /* Cómo se cuenta una figura cerrada: por el contorno o por su lado mayor.
+     Lo decide la categoría del material —el fierro arma marcos, la madera
+     son tablas— y la figura puede decir otra cosa si el caso lo pide, por
+     ejemplo un marco de madera. */
+  const modoCorte = (o, it) => (o && o.corte) || (MQ.categoria(it && it.cat).corteLargo ? "largo" : "contorno");
+
   /* ---------- líneas que salen del croquis ----------
      Una figura con material asignado ya trae su medida: el largo lo da el
      dibujo y la escala, así que no hay que escribirlo otra vez. Solo aplica
@@ -31,15 +37,16 @@ MQ.calc = (function () {
       if (!o.mat) return;
       const it = item(cat, o.mat);
       if (!it || !esLineal(it)) return;
-      const largo = Math.round(MQ.croquis.largoMm(o, mm));
+      const modo = modoCorte(o, it);
+      const largo = Math.round(MQ.croquis.largoMm(o, mm, modo));
       const piezas = MQ.croquis.piezasDe(o);
       if (largo <= 0) return;
       out.push({
         id: "cro:" + o.id, itemId: it.id, cat: it.cat, origen: "croquis", vista: v.nombre,
         nombre: MQ.nombreItem(it), unidad: it.unidad, lineal: true,
-        largo, piezas, nota: "",
+        largo, piezas, nota: "", modo,
         /* los lados por separado: el marco se compra entero pero se corta así */
-        cortes: MQ.croquis.ladosMm(o, mm).map((x) => ({ largo: x.largo, piezas: x.piezas * piezas })),
+        cortes: MQ.croquis.ladosMm(o, mm, modo).map((x) => ({ largo: x.largo, piezas: x.piezas * piezas })),
         cant: (largo / 1000) * piezas, precio: it.precio,
         total: (largo / 1000) * piezas * MQ.num(it.precio, 0)
       });
@@ -190,5 +197,5 @@ MQ.calc = (function () {
     return MQ.dec(cant, entero ? 0 : 2) + " " + u.nombre;
   }
 
-  return { costear, totales, listaCompra, lineasCroquis, cantidad, esLineal, item, conUnidad, cortesDe, textoCorte, agruparLineas, pagado, pagos };
+  return { costear, totales, listaCompra, lineasCroquis, cantidad, esLineal, item, conUnidad, cortesDe, textoCorte, agruparLineas, modoCorte, pagado, pagos };
 })();

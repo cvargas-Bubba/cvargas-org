@@ -80,16 +80,32 @@
 
     const mm = MQ.croquis.mmPorUnidad(partida().croquis);
     const it = mismoMat && MQ.calc.item(S.catalogo, mismoMat);
-    const metros = os.reduce((s, x) => s + MQ.croquis.largoMm(x, mm) / 1000 * MQ.croquis.piezasDe(x), 0);
+    const modoDe = (x) => MQ.calc.modoCorte(x, x.mat && MQ.calc.item(S.catalogo, x.mat));
+    const metros = os.reduce((s, x) => s + MQ.croquis.largoMm(x, mm, modoDe(x)) / 1000 * MQ.croquis.piezasDe(x), 0);
+
+    /* Una figura cerrada se puede contar de dos maneras y el material decide
+       cuál; acá se cambia si el caso lo pide —un marco de madera— y queda
+       anotado en la figura. */
+    const cerradas = os.filter((x) => MQ.croquis.cerrada(x));
+    $("crCorte").hidden = !cerradas.length;
+    if (cerradas.length) {
+      const modo = modoDe(cerradas[0]);
+      const todasIgual = cerradas.every((x) => modoDe(x) === modo);
+      $("crCorte").innerHTML = (todasIgual ? "" : `<option value="=" selected>Se cuentan distinto</option>`) +
+        Object.keys(MQ.CORTES).map((k) =>
+          `<option value="${k}"${todasIgual && k === modo ? " selected" : ""}>${esc(MQ.CORTES[k])}</option>`).join("");
+    }
+
     let q;
     if (varias) {
       q = os.length + " figuras · " + MQ.dec(metros, 2) + " m";
     } else {
-      /* en una figura cerrada el largo es la suma de los lados: conviene decirlo,
-         porque el número no coincide con ninguna de las medidas que se ven */
-      const largo = Math.round(MQ.croquis.largoMm(o, mm));
-      q = (MQ.croquis.cerrada(o) ? "contorno " : "") + largo + " mm × " + MQ.croquis.piezasDe(o)
-        + " = " + MQ.dec(metros, 2) + " m";
+      /* el número de una figura cerrada no coincide con ninguna medida del
+         dibujo: conviene decir de dónde sale */
+      const modo = modoDe(o);
+      const largo = Math.round(MQ.croquis.largoMm(o, mm, modo));
+      const rotulo = MQ.croquis.cerrada(o) ? (modo === "largo" ? "largo " : "contorno ") : "";
+      q = rotulo + largo + " mm × " + MQ.croquis.piezasDe(o) + " = " + MQ.dec(metros, 2) + " m";
     }
     $("crMatCalc").textContent = it ? q + " · " + MQ.clp(metros * it.precio) : q;
   }
@@ -109,7 +125,7 @@
       const it = MQ.calc.item(S.catalogo, id);
       let m = 0;
       (p.croquis.vistas || []).forEach((v) => (v.objetos || []).forEach((o) => {
-        if (o.mat === id) m += MQ.croquis.largoMm(o, mm) / 1000 * MQ.croquis.piezasDe(o);
+        if (o.mat === id) m += MQ.croquis.largoMm(o, mm, MQ.calc.modoCorte(o, it)) / 1000 * MQ.croquis.piezasDe(o);
       }));
       return `<button type="button" class="ley" data-mat="${esc(id)}" title="Seleccionar todo lo de este material">
         <span class="ley-c" style="background:${MQ.rgb(MQ.colorMat(i))}"></span>
@@ -876,6 +892,11 @@
       croquis.asignar($("crMat").value, undefined); pintarBarraMaterial();
     });
     $("crPiezas").addEventListener("input", () => { croquis.asignar(undefined, $("crPiezas").value); pintarBarraMaterial(); });
+    $("crCorte").addEventListener("change", () => {
+      if ($("crCorte").value === "=") return;
+      croquis.corte($("crCorte").value);
+      pintarBarraMaterial();
+    });
 
     document.addEventListener("keydown", (ev) => {
       if ($("view-cotizar").hidden || $("subCroquis").hidden || !croquis) return;
