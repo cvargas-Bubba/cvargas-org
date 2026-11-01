@@ -286,6 +286,12 @@ img, svg { max-width: 100%; }
 .tbl td { padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, var(--linea) 55%, transparent); vertical-align: middle; }
 .tbl .cell { padding: 7px 10px; font-size: 13.5px; }
 .w40 { width: 40px; } .w70 { width: 80px; } .w110 { width: 120px; } .w140 { width: 150px; }
+.tbl th.der { text-align: right; }
+/* las categorías parten la tabla: el catálogo se lee por grupos */
+.tbl .grupo td { font: 600 10.5px/1 var(--cond); letter-spacing: 1.2px; text-transform: uppercase; color: var(--acento); padding: 16px 8px 6px; border-bottom: 1px solid color-mix(in srgb, var(--acento) 30%, var(--linea)); }
+.tbl tr:first-child .grupo td, .tbl .grupo:first-child td { padding-top: 4px; }
+.it-acc { white-space: nowrap; text-align: right; }
+#tblItems { min-width: 760px; }
 
 .params-grid, .company-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
 .company-grid .full { grid-column: 1 / -1; }

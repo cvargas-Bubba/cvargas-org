@@ -54,7 +54,9 @@
   }
 
   function pintarBarraMaterial() {
-    if (!croquis) return;
+    /* sin partida abierta no hay croquis que leer: el editor consulta la
+       partida en curso y reventaría */
+    if (!croquis || !partida()) { $("crMatBar").hidden = true; return; }
     const os = croquis.seleccionados();
     $("crMatBar").hidden = !os.length;
     if (!os.length) return;
@@ -585,14 +587,31 @@
   }
 
   /* ================= CATÁLOGO ================= */
+  /* El catálogo se mantiene ordenado por categoría y, dentro de ella, por
+     nombre: así la lista de la tabla y la de los desplegables al cotizar son
+     la misma, y un ítem nuevo cae donde corresponde en vez de al final. */
+  const ORDEN_CAT = MQ.CATEGORIAS.map((c) => c.id);
+  const ordenarItems = (items) => items.slice().sort((a, b) =>
+    ORDEN_CAT.indexOf(a.cat) - ORDEN_CAT.indexOf(b.cat) ||
+    MQ.nombreItem(a).localeCompare(MQ.nombreItem(b), "es", { numeric: true }));
+
   function pintarCatalogo() {
     const cat = S.catalogo;
+    /* el almacén queda en el mismo orden que la tabla: las filas se
+       direccionan por índice y las dos listas no pueden separarse */
+    cat.items = ordenarItems(cat.items || []);
     const inp = (val, campo, i, extra) =>
       `<input class="input cell" value="${esc(val)}" data-campo="${campo}" data-i="${i}" ${extra || ""}>`;
 
-    $("tblItems").querySelector("tbody").innerHTML = (cat.items || []).map((it, i) => {
+    let grupo = null;
+    $("tblItems").querySelector("tbody").innerHTML = cat.items.map((it, i) => {
       const esMadera = MQ.categoria(it.cat).escuadria;
-      return `<tr>
+      let cabecera = "";
+      if (it.cat !== grupo) {
+        grupo = it.cat;
+        cabecera = `<tr class="grupo"><td colspan="7">${esc(MQ.categoria(grupo).nombre)}</td></tr>`;
+      }
+      return cabecera + `<tr>
         <td class="w140"><select class="select cell" data-campo="cat" data-i="${i}">${MQ.CATEGORIAS.map((c) =>
           `<option value="${c.id}"${c.id === it.cat ? " selected" : ""}>${esc(c.nombre)}</option>`).join("")}</select></td>
         <td>${inp(it.nombre, "nombre", i)}</td>
@@ -601,7 +620,10 @@
         <td class="w110"><select class="select cell" data-campo="unidad" data-i="${i}">${Object.keys(MQ.UNIDADES).map((u) =>
           `<option value="${u}"${u === it.unidad ? " selected" : ""}>${esc(MQ.UNIDADES[u].largo)}</option>`).join("")}</select></td>
         <td class="w110">${inp(it.precio, "precio", i, 'inputmode="numeric"')}</td>
-        <td class="w40"><button class="icon" data-del-item="${i}" title="Quitar" aria-label="Quitar ítem">✕</button></td>
+        <td class="w70 it-acc">
+          <button class="icon" data-dup-item="${i}" title="Duplicar para modificarlo" aria-label="Duplicar ítem">⧉</button>
+          <button class="icon" data-del-item="${i}" title="Quitar" aria-label="Quitar ítem">✕</button>
+        </td>
       </tr>`;
     }).join("");
 
@@ -617,7 +639,10 @@
       const it = cat.items[+el.dataset.i];
       if (!it) return;
       const campo = el.dataset.campo;
-      if (campo === "nombre") it.nombre = el.value.trim();
+      /* un material sin nombre no se puede elegir ni leer en la hoja de
+         taller: si se borra, se queda con el que tenía. Para sacarlo está
+         el botón de quitar. */
+      if (campo === "nombre") it.nombre = el.value.trim() || it.nombre;
       else if (campo === "cat" || campo === "unidad") it[campo] = el.value;
       else it[campo] = Math.max(0, MQ.num(el.value, 0));
     });
@@ -626,7 +651,7 @@
       margen: Math.max(0, MQ.num($("pMargen").value, 0)),
       redondeo: Math.max(1, MQ.num($("pRedondeo").value, 1))
     };
-    cat.items = cat.items.filter((it) => it.nombre);
+    cat.items = ordenarItems(cat.items);
     return cat;
   }
 
@@ -1125,27 +1150,48 @@
       }
     });
 
-    /* ---- catálogo ---- */
-    $("tblItems").addEventListener("change", (ev) => {
-      S.catalogo = leerCatalogo();
-      if (ev.target.dataset.campo === "cat") pintarCatalogo();
-    });
+    /* ---- catálogo ----
+       Se guarda al salir de cada campo, no con un botón: así un material
+       recién creado ya está en los desplegables de la cotización —que es
+       para lo que uno lo crea— sin tener que acordarse de guardar. */
+    const guardarCatalogo = (cat) => {
+      S.saveCatalogo(cat || leerCatalogo());
+      pintarCatalogo();
+    };
+    $("tblItems").addEventListener("change", () => guardarCatalogo());
+    ["pGastos", "pMargen", "pRedondeo"].forEach((id) =>
+      $(id).addEventListener("change", () => guardarCatalogo()));
     $("tblItems").addEventListener("click", (ev) => {
-      const b = ev.target.closest("[data-del-item]");
+      const b = ev.target.closest("[data-del-item], [data-dup-item]");
       if (!b) return;
       const cat = leerCatalogo();
+      if (b.dataset.dupItem != null) {
+        /* la copia queda junto al original y con el mismo precio: se duplica
+           para cambiarle una medida o un detalle, no para partir de cero */
+        const o = cat.items[+b.dataset.dupItem];
+        if (!o) return;
+        const copia = MQ.clone(o);
+        copia.id = "i" + MQ.uid();
+        copia.nombre = o.nombre + " (copia)";
+        cat.items.splice(+b.dataset.dupItem + 1, 0, copia);
+        guardarCatalogo(cat);
+        const f = $("tblItems").querySelector(`[data-campo="nombre"][data-i="${S.catalogo.items.findIndex((x) => x.id === copia.id)}"]`);
+        if (f) { f.focus(); f.select(); }
+        MQ.toast("Copia creada: cámbiale lo que corresponda");
+        return;
+      }
+      const it = cat.items[+b.dataset.delItem];
+      if (it && !confirm("¿Quitar «" + MQ.nombreItem(it) + "» del catálogo?")) return;
       cat.items.splice(+b.dataset.delItem, 1);
-      S.catalogo = cat; pintarCatalogo();
+      guardarCatalogo(cat);
     });
     $("addItem").addEventListener("click", () => {
       const cat = leerCatalogo();
-      cat.items.push({ id: "i" + MQ.uid(), cat: "insumo", nombre: "Ítem nuevo", unidad: "un", precio: 0 });
-      S.catalogo = cat; pintarCatalogo();
-    });
-    $("catSave").addEventListener("click", () => {
-      S.saveCatalogo(leerCatalogo());
-      pintarCatalogo();
-      MQ.toast("Materiales y precios guardados");
+      const nuevo = { id: "i" + MQ.uid(), cat: "insumo", nombre: "Ítem nuevo", unidad: "un", precio: 0 };
+      cat.items.push(nuevo);
+      guardarCatalogo(cat);
+      const f = $("tblItems").querySelector(`[data-campo="nombre"][data-i="${S.catalogo.items.findIndex((x) => x.id === nuevo.id)}"]`);
+      if (f) { f.focus(); f.select(); }
     });
     $("catReset").addEventListener("click", () => {
       if (!confirm("¿Volver a los precios de referencia? Se pierden tus valores.")) return;
