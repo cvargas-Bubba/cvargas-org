@@ -90,6 +90,31 @@
     $("crMatCalc").textContent = it ? q + " · " + MQ.clp(metros * it.precio) : q;
   }
 
+  /* Nomenclatura: qué material es cada color del croquis. Reemplaza al
+     nombre escrito sobre cada figura, que con unas pocas piezas tapaba el
+     dibujo. Se arma del croquis completo, no de la vista, para que una
+     pieza tenga el mismo color en el frente y en la planta. */
+  function pintarLeyenda() {
+    const p = partida();
+    if (!p) { $("crLeyenda").hidden = true; return; }
+    const mats = MQ.croquis.materiales(p.croquis);
+    $("crLeyenda").hidden = !mats.length;
+    if (!mats.length) return;
+    const mm = MQ.croquis.mmPorUnidad(p.croquis);
+    $("crLeyenda").innerHTML = mats.map((id, i) => {
+      const it = MQ.calc.item(S.catalogo, id);
+      let m = 0;
+      (p.croquis.vistas || []).forEach((v) => (v.objetos || []).forEach((o) => {
+        if (o.mat === id) m += MQ.croquis.largoMm(o, mm) / 1000 * MQ.croquis.piezasDe(o);
+      }));
+      return `<button type="button" class="ley" data-mat="${esc(id)}" title="Seleccionar todo lo de este material">
+        <span class="ley-c" style="background:${MQ.rgb(MQ.colorMat(i))}"></span>
+        <span class="ley-n">${esc(it ? MQ.nombreItem(it) : "Material")}</span>
+        <b class="mono">${MQ.dec(m, 2)} m</b>
+      </button>`;
+    }).join("");
+  }
+
   const AYUDA = {
     sel: "Haz clic en un trazo para seleccionarlo y arrástralo. Para varios a la vez, arrastra un recuadro sobre ellos o súmalos con Ctrl o Shift: el material se asigna a todos juntos. Doble clic te deja escribir la medida exacta, o el texto de una cota o un rótulo. Duplicar (Ctrl+D) repite lo seleccionado con su material; Ctrl+C y Ctrl+V lo llevan a otra vista.",
     lapiz: "Dibuja arrastrando, como con un lápiz. No se ajusta a la grilla.",
@@ -117,7 +142,7 @@
     croquis = MQ.croquis.montar(
       $("crLienzo"),
       () => ({ croquis: partida().croquis, vista: vista() }),
-      () => { guardarBorrador(); pintarBarraMaterial(); pintarLineas(); pintarHoja(); },
+      () => { guardarBorrador(); pintarBarraMaterial(); pintarLeyenda(); pintarLineas(); pintarHoja(); },
       (id) => MQ.nombreCorto(MQ.calc.item(S.catalogo, id))
     );
   }
@@ -207,6 +232,7 @@
     pintarVistas();
     if (croquis) croquis.reiniciar();
     pintarBarraMaterial();
+    pintarLeyenda();
     pintarLineas();
   }
 
@@ -777,6 +803,13 @@
     $("crClear").addEventListener("click", () => {
       if (MQ.croquis.vistaVacia(vista())) return MQ.toast("Esta vista ya está vacía.");
       if (confirm("¿Borrar todo lo dibujado en esta vista?")) croquis.limpiar();
+    });
+    $("crLeyenda").addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-mat]");
+      if (!b) return;
+      const n = croquis.seleccionarMat(b.dataset.mat);
+      pintarBarraMaterial();
+      if (!n) MQ.toast("En esta vista no hay nada de ese material.");
     });
     $("crMat").addEventListener("change", () => {
       if ($("crMat").value === "=") return;   // "varios materiales": no toca nada

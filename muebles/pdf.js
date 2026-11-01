@@ -86,21 +86,25 @@ MQ.pdf = (function () {
     const X = (v) => ox + v * s, Y = (v) => oy + v * s;
     fig.formas.forEach((f) => {
       const e = TRAZO[f.clase] || {};
+      /* el color del material manda sobre el de la clase, igual que en
+         pantalla, y un poco más grueso para que el tono se note en papel */
+      const borde = f.col || e.borde;
+      const grosor = f.col ? e.grosor + 0.15 : e.grosor;
       if (f.t === "rect") {
-        if (!e.borde) return;
-        doc.setDrawColor.apply(doc, e.borde); doc.setLineWidth(e.grosor);
+        if (!borde) return;
+        doc.setDrawColor.apply(doc, borde); doc.setLineWidth(grosor);
         doc.rect(X(f.x), Y(f.y), f.w * s, f.h * s, "S");
       } else if (f.t === "poli") {
-        if (!e.borde) return;
-        doc.setDrawColor.apply(doc, e.borde); doc.setLineWidth(e.grosor);
+        if (!borde) return;
+        doc.setDrawColor.apply(doc, borde); doc.setLineWidth(grosor);
         const v = f.pts, n = f.cerrado ? v.length : v.length - 1;
         for (let i = 0; i < n; i++) {
           const a = v[i], b = v[(i + 1) % v.length];
           doc.line(X(a.x), Y(a.y), X(b.x), Y(b.y));
         }
       } else if (f.t === "linea") {
-        if (!e.borde) return;
-        doc.setDrawColor.apply(doc, e.borde); doc.setLineWidth(e.grosor);
+        if (!borde) return;
+        doc.setDrawColor.apply(doc, borde); doc.setLineWidth(grosor);
         doc.line(X(f.x1), Y(f.y1), X(f.x2), Y(f.y2));
       } else if (f.t === "circulo") {
         doc.setFillColor.apply(doc, e.relleno || GRIS);
@@ -134,6 +138,23 @@ MQ.pdf = (function () {
       doc.setFont("helvetica", "normal").setFontSize(7.5);
       doc.text("un cuadro = " + p.croquis.escala + " mm", M + 34, y);
       dibujarFigura(doc, fig, M, y + 3, ANCHO_DIB);
+      /* la nomenclatura al costado del dibujo, que es donde sobra papel:
+         una muestra del color y el material que le toca */
+      if (fig.leyenda && fig.leyenda.length) {
+        const lx = M + ANCHO_DIB + 6;
+        let ly = y + 6;
+        doc.setFont("helvetica", "bold").setFontSize(6.5).setTextColor.apply(doc, GRIS);
+        doc.text("MATERIALES", lx, ly); ly += 4;
+        doc.setFont("helvetica", "normal").setFontSize(7);
+        fig.leyenda.forEach((l) => {
+          doc.setDrawColor.apply(doc, l.col); doc.setLineWidth(0.9);
+          doc.line(lx, ly - 1, lx + 6, ly - 1);
+          doc.setTextColor.apply(doc, NEGRO);
+          doc.text(doc.splitTextToSize(l.nombre, ANCHO - M - lx - 9)[0], lx + 8, ly);
+          ly += 4.2;
+        });
+        doc.setLineWidth(0.3);
+      }
       y += alto + 11;
     });
     return y;

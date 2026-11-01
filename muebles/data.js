@@ -120,6 +120,18 @@ MQ.nombreCorto = function (it) {
   return n.length > 20 ? n.slice(0, 19) + "…" : n;
 };
 
+/* ---------- colores de los materiales ----------
+   Escribir el nombre sobre cada trazo tapaba el dibujo apenas había unas
+   pocas piezas. El color identifica el material y la nomenclatura dice cuál
+   es cada uno, que es como se lee un plano. Son tonos medios a propósito:
+   tienen que leerse sobre la pantalla oscura y sobre el papel blanco. */
+MQ.COLORES_MAT = [
+  [232, 144, 58], [79, 163, 227], [95, 190, 125], [216, 107, 107],
+  [180, 139, 214], [205, 181, 60], [73, 194, 194], [201, 138, 98]
+];
+MQ.colorMat = (i) => MQ.COLORES_MAT[((i % MQ.COLORES_MAT.length) + MQ.COLORES_MAT.length) % MQ.COLORES_MAT.length];
+MQ.rgb = (c) => "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+
 /* ---------- etapas del trabajo ----------
    El camino que recorre un trabajo, de la cotización a la entrega. Cada
    etapa guarda su fecha en `hitos`, así el historial dice no solo en qué

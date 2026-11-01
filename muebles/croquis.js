@@ -216,39 +216,42 @@ MQ.croquis = (function () {
     /* medida de la figura, escrita dentro, sin tener que dibujar la cota */
     const acote = (o) => {
       if (!acotar) return;
+      /* cuántas piezas iguales van, que es lo único del material que vale la
+         pena escribir sobre la figura: el resto lo dice el color */
+      const p = piezasDe(o);
+      const rep = o.mat && p > 1 ? "  ·  " + p + " pzas" : "";
       if (o.t === "rect" || o.t === "rombo") {
         const an = Math.abs(o.w), al = Math.abs(o.h);
         if (an < MIN_W || al < MIN_H) return;
-        texto(o.x + o.w / 2, o.y + o.h / 2 + 3, Math.round(an * mm) + " × " + Math.round(al * mm), "acote");
+        texto(o.x + o.w / 2, o.y + o.h / 2 + 3, Math.round(an * mm) + " × " + Math.round(al * mm) + rep, "acote");
       } else if (o.t === "linea") {
         const l = largo(o);
         if (l < MIN_W) return;
-        texto((o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2 - 6, Math.round(l * mm) + " mm", "acote");
+        texto((o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2 - 6, Math.round(l * mm) + " mm" + rep, "acote");
       }
     };
 
-    /* etiqueta del material asignado, para ver de un vistazo qué es cada trazo */
-    const marcaMat = (o) => {
-      if (!o.mat || !op.nombreMat) return;
-      const n = op.nombreMat(o.mat);
-      if (!n) return;
-      const b = caja(o);
-      const p = piezasDe(o);
-      /* bien por encima de la figura: ahí abajo va la medida acotada */
-      texto((b.x1 + b.x2) / 2, b.y1 - 15, (p > 1 ? p + " × " : "") + n, "mat");
+    /* El material se dice con el color del trazo y se explica en la
+       nomenclatura. El color se reparte por orden de aparición en todo el
+       croquis, no en la vista, para que una pieza sea del mismo color en el
+       frente y en la planta. */
+    const mats = op.nombreMat ? materiales(croquis) : [];
+    const colorDe = (o) => {
+      const i = o.mat ? mats.indexOf(o.mat) : -1;
+      return i >= 0 ? MQ.colorMat(i) : null;
     };
+    const pintado = (f, o) => { const c = colorDe(o); if (c) f.col = c; formas.push(f); return f; };
 
     (vista.objetos || []).forEach((o) => {
-      marcaMat(o);
       if (o.t === "rect") {
-        formas.push({ t: "rect", x: Math.min(o.x, o.x + o.w), y: Math.min(o.y, o.y + o.h), w: Math.abs(o.w), h: Math.abs(o.h), clase: "trazo" });
+        pintado({ t: "rect", x: Math.min(o.x, o.x + o.w), y: Math.min(o.y, o.y + o.h), w: Math.abs(o.w), h: Math.abs(o.h), clase: "trazo" }, o);
         acote(o);
       } else if (o.t === "rombo") {
-        poli(vertices(o), true, "trazo"); acote(o);
+        pintado({ t: "poli", pts: vertices(o), cerrado: true, clase: "trazo" }, o); acote(o);
       } else if (o.t === "poli") {
-        poli(vertices(o), o.cerrado, "trazo");
+        pintado({ t: "poli", pts: vertices(o), cerrado: !!o.cerrado, clase: "trazo" }, o);
       } else if (o.t === "lapiz") {
-        poli(vertices(o), false, "lapiz");
+        pintado({ t: "poli", pts: vertices(o), cerrado: false, clase: "lapiz" }, o);
       } else if (o.t === "texto") {
         texto(o.x, o.y, o.s, "rotulo");
       } else if (o.t === "cota") {
@@ -259,7 +262,8 @@ MQ.croquis = (function () {
         linea(o.x2 - nx, o.y2 - ny, o.x2 + nx, o.y2 + ny, "cota");
         texto((o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2 - 7, etiquetaCota(o, mm), "dm");
       } else {
-        linea(o.x1, o.y1, o.x2, o.y2, "trazo"); acote(o);
+        pintado({ t: "linea", x1: o.x1, y1: o.y1, x2: o.x2, y2: o.y2, clase: "trazo" }, o);
+        acote(o);
       }
     });
 
@@ -276,7 +280,19 @@ MQ.croquis = (function () {
     if (op.hover && sels.indexOf(op.hover) < 0) marco(op.hover, "hover");
     sels.forEach((id) => marco(id, "sel"));
 
-    return { w: an, h: H, formas };
+    /* la nomenclatura: qué material es cada color, en el orden del dibujo */
+    const leyenda = mats.map((id, i) => ({ mat: id, col: MQ.colorMat(i), nombre: op.nombreMat(id) || "Material" }));
+
+    return { w: an, h: H, formas, leyenda };
+  }
+
+  /* los materiales usados en todo el croquis, en orden de aparición */
+  function materiales(croquis) {
+    const out = [];
+    (((croquis || {}).vistas) || []).forEach((v) => (v.objetos || []).forEach((o) => {
+      if (o.mat && out.indexOf(o.mat) < 0) out.push(o.mat);
+    }));
+    return out;
   }
 
   const vistaVacia = (v) => !v || !(v.objetos || []).length;
@@ -706,6 +722,12 @@ MQ.croquis = (function () {
         return os.length ? clonar(os) : 0;
       },
       hayCopia: () => !!(porta && porta.length),
+      /* desde la nomenclatura: marcar todo lo que es de ese material */
+      seleccionarMat(id) {
+        sel = objetos().filter((o) => o.mat === id).map((o) => o.id);
+        hover = null; pintar(); alCambiar();
+        return sel.length;
+      },
       herramienta(h) { if (cadena) terminarCadena(); herramienta = h; sel = []; hover = null; pintar(); },
       ajuste(v) { libre = !v; },
       enCadena: () => !!cadena,
@@ -738,5 +760,5 @@ MQ.croquis = (function () {
     };
   }
 
-  return { figura, montar, vacio, vistaVacia, conDibujo, mmPorUnidad, largoMm, ladosMm, piezasDe, cerrada, W, H, CELDA };
+  return { figura, montar, vacio, vistaVacia, conDibujo, mmPorUnidad, largoMm, ladosMm, piezasDe, cerrada, materiales, W, H, CELDA };
 })();
