@@ -74,7 +74,9 @@
     $("crMat").innerHTML = (mixto ? `<option value="=" selected>Varios materiales</option>` : "") +
       `<option value=""${!mixto && !mismoMat ? " selected" : ""}>Sin material</option>` +
       lista.map((i) => `<option value="${esc(i.id)}"${i.id === mismoMat ? " selected" : ""}>${esc(MQ.nombreItem(i))}</option>`).join("");
-    $("crPiezas").value = mismasPz ? MQ.croquis.piezasDe(o) : "";
+    /* mientras se escribe acá no se le reescribe el valor: el cursor saltaría
+       al final en cada tecla */
+    if (document.activeElement !== $("crPiezas")) $("crPiezas").value = mismasPz ? MQ.croquis.piezasDe(o) : "";
 
     const mm = MQ.croquis.mmPorUnidad(partida().croquis);
     const it = mismoMat && MQ.calc.item(S.catalogo, mismoMat);
@@ -159,6 +161,31 @@
     }).join("");
   }
 
+  /* Solo los números: se llama en cada tecla mientras se escribe un largo o
+     una cantidad, así que no puede rehacer los campos. Rehacerlos reemplaza
+     el input que uno está usando y el cursor se va: parecía que la casilla
+     se desactivaba sola al primer dígito. */
+  function refrescarTotales() {
+    const p = partida();
+    if (!p) return;
+    const c = MQ.calc.costear(p, S.catalogo);
+    const aMano = c.lineas.filter((l) => l.origen !== "croquis");
+    $("lineas").querySelectorAll(".lin").forEach((fila, i) => {
+      const l = (p.lineas || [])[i];
+      const calc = l && aMano.find((x) => x.id === l.id);
+      const t = fila.querySelector(".lin-t");
+      if (t) t.textContent = calc ? MQ.clp(calc.total) : "$0";
+    });
+    pintarResumenPartida(c);
+  }
+
+  function pintarResumenPartida(c) {
+    $("partidaPrecio").textContent = MQ.clp(c.unitario);
+    $("partidaDesglose").innerHTML = c.porCategoria.map((x) =>
+      `<span>${esc(x.nombre)} <b class="mono">${MQ.clp(x.total)}</b></span>`).join("") +
+      (c.costos.gastos + c.costos.margen > 0 ? `<span>Gastos y margen <b class="mono">${MQ.clp(c.costos.gastos + c.costos.margen)}</b></span>` : "");
+  }
+
   function pintarLineas() {
     const p = partida();
     if (!p) return;
@@ -194,10 +221,7 @@
       </div>`;
     }).join("") || `<p class="hint lin-vacio">Tornillos, cola, barniz, horas de taller: lo que no se dibuja va acá.</p>`;
 
-    $("partidaPrecio").textContent = MQ.clp(c.unitario);
-    $("partidaDesglose").innerHTML = c.porCategoria.map((x) =>
-      `<span>${esc(x.nombre)} <b class="mono">${MQ.clp(x.total)}</b></span>`).join("") +
-      (c.costos.gastos + c.costos.margen > 0 ? `<span>Gastos y margen <b class="mono">${MQ.clp(c.costos.gastos + c.costos.margen)}</b></span>` : "");
+    pintarResumenPartida(c);
   }
 
   function leerLineas() {
@@ -879,7 +903,7 @@
       p.lineas.push(MQ.nuevaLinea(it.id, it.unidad));
       pintarLineas(); pintarHoja();
     });
-    $("lineas").addEventListener("input", () => { leerLineas(); pintarLineas(); pintarHoja(); });
+    $("lineas").addEventListener("input", () => { leerLineas(); refrescarTotales(); pintarHoja(); });
     $("lineas").addEventListener("change", (ev) => {
       leerLineas();
       if (ev.target.dataset.campo === "itemId") pintarLineas();
