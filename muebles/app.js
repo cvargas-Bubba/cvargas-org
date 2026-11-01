@@ -193,16 +193,27 @@
     const delCroquis = c.lineas.filter((l) => l.origen === "croquis");
     const aMano = c.lineas.filter((l) => l.origen !== "croquis");
 
-    $("lineasCroquis").innerHTML = delCroquis.length ? delCroquis.map((l) => `
-      <div class="lin lin-ro">
-        <span class="lin-n">${esc(l.nombre)}<span class="lin-v">${esc(l.vista)}</span></span>
+    /* juntar las repetidas es para revisar: doce filas idénticas no dejan
+       ver si falta algo. El detalle pieza por pieza sigue a un clic. */
+    const juntar = S.prefs.agruparCroquis !== false;
+    $("crAgrupar").checked = juntar;
+    const filas = juntar ? MQ.calc.agruparLineas(delCroquis) : delCroquis;
+
+    $("lineasCroquis").innerHTML = filas.length ? filas.map((l) => {
+      const d = l.vistas ? l.vistas.join(" · ") : l.vista;
+      return `<div class="lin lin-ro">
+        <span class="lin-n">${esc(l.nombre)}<span class="lin-v">${esc(d)}</span></span>
         <span class="lin-d mono">${esc(MQ.calc.textoCorte(l))}</span>
         <span class="lin-c mono">${esc(MQ.calc.conUnidad(l.cant, l.unidad))}</span>
         <span class="lin-t mono">${MQ.clp(l.total)}</span>
-      </div>`).join("") : `<p class="hint lin-vacio">Asigna material a las figuras del croquis y aparecen acá con su largo.</p>`;
+      </div>`;
+    }).join("") : `<p class="hint lin-vacio">Asigna material a las figuras del croquis y aparecen acá con su largo.</p>`;
 
+    const piezas = delCroquis.reduce((s, l) => s + l.piezas, 0);
     $("croquisResumen").textContent = delCroquis.length
-      ? delCroquis.length + (delCroquis.length === 1 ? " pieza" : " piezas") + " · " + MQ.clp(delCroquis.reduce((s, l) => s + l.total, 0))
+      ? piezas + (piezas === 1 ? " pieza" : " piezas") +
+        (juntar && filas.length < delCroquis.length ? " en " + filas.length + " líneas" : "") +
+        " · " + MQ.clp(delCroquis.reduce((s, l) => s + l.total, 0))
       : "";
 
     $("lineas").innerHTML = (p.lineas || []).map((l, i) => {
@@ -896,6 +907,10 @@
     });
 
     /* ---- materiales de la partida ---- */
+    $("crAgrupar").addEventListener("change", () => {
+      S.setPref("agruparCroquis", $("crAgrupar").checked);
+      pintarLineas();
+    });
     $("addLinea").addEventListener("click", () => {
       const p = partida();
       const it = (S.catalogo.items || [])[0];

@@ -54,6 +54,34 @@ MQ.calc = (function () {
     return l.lineal && l.largo > 0 && l.piezas > 0 ? [{ largo: l.largo, piezas: l.piezas }] : [];
   }
 
+  /* ---------- juntar las repetidas ----------
+     Un mueble con doce piezas iguales llena la lista de filas idénticas y
+     revisar si está todo considerado se vuelve imposible. Se juntan las que
+     son el mismo material y el mismo corte; los cortes se suman por largo,
+     así el desglose de un marco sigue cuadrando. */
+  function agruparLineas(ls) {
+    const out = [];
+    (ls || []).forEach((l) => {
+      const g = out.find((x) => x.itemId === l.itemId && x.unidad === l.unidad && x.largo === l.largo);
+      if (!g) {
+        const c = Object.assign({}, l);
+        c.cortes = cortesDe(l).map((x) => ({ largo: x.largo, piezas: x.piezas }));
+        c.vistas = l.vista ? [l.vista] : [];
+        c.juntas = 1;
+        out.push(c);
+        return;
+      }
+      g.piezas += l.piezas; g.cant += l.cant; g.total += l.total; g.juntas++;
+      cortesDe(l).forEach((x) => {
+        const y = g.cortes.find((z) => z.largo === x.largo);
+        if (y) y.piezas += x.piezas; else g.cortes.push({ largo: x.largo, piezas: x.piezas });
+      });
+      if (l.vista && g.vistas.indexOf(l.vista) < 0) g.vistas.push(l.vista);
+    });
+    out.forEach((g) => g.cortes.sort((a, b) => b.largo - a.largo));
+    return out;
+  }
+
   /* Cómo se escribe el corte de una línea. Una figura cerrada se desglosa en
      sus lados, que es como se corta en el banco; si son demasiados distintos
      —un trazo a mano alzada— el total es lo único que sirve. */
@@ -66,7 +94,7 @@ MQ.calc = (function () {
 
   /* ---------- una partida ---------- */
   function costear(p, cat) {
-    const lineas = (p.lineas || []).map((l) => {
+    const aMano = (p.lineas || []).map((l) => {
       const it = item(cat, l.itemId);
       if (!it) return null;
       const cant = cantidad(l, it);
@@ -79,8 +107,9 @@ MQ.calc = (function () {
         cant, precio: it.precio, total: cant * MQ.num(it.precio, 0), origen: "mano"
       };
     }).filter(Boolean);
-    /* las del croquis van primero: son el cuerpo del mueble */
-    lineasCroquis(p, cat).forEach((l) => lineas.unshift(l));
+    /* las del croquis van primero —son el cuerpo del mueble— y en el orden
+       en que se dibujaron, que es como uno las repasa */
+    const lineas = lineasCroquis(p, cat).concat(aMano);
 
     /* el desglose se agrupa por categoría, que es como se mira un costo */
     const porCategoria = MQ.CATEGORIAS.map((c) => ({
@@ -161,5 +190,5 @@ MQ.calc = (function () {
     return MQ.dec(cant, entero ? 0 : 2) + " " + u.nombre;
   }
 
-  return { costear, totales, listaCompra, lineasCroquis, cantidad, esLineal, item, conUnidad, cortesDe, textoCorte, pagado, pagos };
+  return { costear, totales, listaCompra, lineasCroquis, cantidad, esLineal, item, conUnidad, cortesDe, textoCorte, agruparLineas, pagado, pagos };
 })();

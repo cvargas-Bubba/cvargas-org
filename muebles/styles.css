@@ -155,6 +155,8 @@ img, svg { max-width: 100%; }
 
 /* ---------- materiales de la partida ---------- */
 .lin-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+/* el interruptor va junto al título; el resumen se queda a la derecha */
+.lin-h .check { margin-right: auto; }
 .lin { display: grid; grid-template-columns: minmax(0, 1fr) 128px 112px 92px auto; gap: 8px; align-items: center; margin-bottom: 8px; }
 .lin-ro { grid-template-columns: minmax(0, 1fr) 128px 112px 92px; padding: 9px 0; border-bottom: 1px solid color-mix(in srgb, var(--linea) 55%, transparent); margin-bottom: 0; }
 .lin-n { font-size: 14px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }

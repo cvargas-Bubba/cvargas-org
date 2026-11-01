@@ -132,6 +132,11 @@ MQ.store = (function () {
     S.quotes = S.quotes.filter((q) => q.id !== id); LS.set("quotes", S.quotes); emit("quotes");
   };
 
+  /* Preferencias de vista de este equipo: cómo se mira la app, no datos del
+     trabajo. Viven aparte para no ensuciar la cotización ni el catálogo. */
+  S.prefs = LS.get("prefs") || {};
+  S.setPref = function (k, v) { S.prefs[k] = v; LS.set("prefs", S.prefs); };
+
   S.loadDraft = () => sanear(LS.get("draft"));
   S.saveDraft = (q) => LS.set("draft", q);
 
