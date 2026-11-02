@@ -98,3 +98,21 @@ y queda guardado en ese navegador. Se puede descargar desde
 
 GitHub Pages, en el dominio `cvargas.org`. Cada cambio que se sube a `main` se
 publica solo en un par de minutos.
+
+### La versión en los enlaces a css y js
+
+Los `index.html` llaman a sus archivos con una versión pegada:
+
+```html
+<script src="indice.js?v=20261102b"></script>
+```
+
+GitHub Pages manda los archivos con `Cache-Control: max-age=600`, así que el
+navegador se queda con la copia que bajó y durante un rato no vuelve a
+preguntar: se publica un cambio y en pantalla sigue lo de antes. Con la versión
+en el enlace, apenas cambia ese número la dirección es otra y el navegador baja
+el archivo nuevo sí o sí.
+
+**Al editar un `.js` o un `.css` hay que subir ese número** en el `index.html`
+que lo llama. Si no, el cambio puede tardar en verse. Mientras tanto, un
+recargado forzado —`Ctrl+Shift+R`— salta la caché a mano.
