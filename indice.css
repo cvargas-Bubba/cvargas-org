@@ -48,6 +48,12 @@ img { max-width: 100%; display: block; }
 .t-t { color: var(--suave); font-size: 14.5px; }
 .t-pie { margin-top: auto; font: 600 12.5px/1 var(--sans); color: var(--acento); }
 
+/* en obra: solo la ve el dueño, y se nota que está a medio hacer */
+.tarjeta.obra a { border-style: dashed; }
+.tarjeta.obra .t-pie { color: var(--suave); }
+.tarjeta.obra .t-pie::before { content: "🔧 "; }
+.obra-nota { color: var(--tenue); font-size: 11.5px; text-decoration: none; }
+
 .nota { color: var(--suave); font-size: 13.5px; margin: 18px 2px 0; }
 
 .otras { margin-top: 42px; border-top: 1px solid var(--linea); padding-top: 22px; }

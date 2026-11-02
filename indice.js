@@ -5,6 +5,11 @@
    `privada: true` significa que la tarjeta no existe para nadie más: solo
    aparece cuando entra el dueño del sitio. Sin sesión, o con otra cuenta,
    la página se ve como si esas aplicaciones no estuvieran.
+
+   `enObra: true` es lo mismo, pero por otro motivo: todavía no está
+   terminada. El dueño la ve rotulada «en preparación» para seguir
+   trabajándola; el resto no la ve. Al terminarla se borra esa línea y queda
+   a la vista de todos.
    ────────────────────────────────────────────────────────────────────────── */
 const MODULOS = [
   {
@@ -30,16 +35,16 @@ const MODULOS = [
     nombre: "Patio de áridos",
     bajada: "Prototipo",
     texto: "Venta de áridos, con vista de cliente y panel del vendedor.",
-    url: "aridos/"
+    url: "aridos/",
+    enObra: true
   },
   {
-    /* tiene cuenta propia, así que el candado acá solo esconde la puerta:
-       adentro igual pide su correo y su contraseña */
+    /* pública: cualquiera se registra con su correo y lleva sus propias
+       cuentas, que quedan en su cuenta y no en la de uno */
     nombre: "Cuentas claras",
-    bajada: "Cuenta aparte",
-    texto: "Ingresos, gastos y metas de ahorro. Se instala en el teléfono.",
-    url: "cuentas/",
-    privada: true
+    bajada: "Con tu propia cuenta",
+    texto: "Ingresos, gastos y metas de ahorro. Se instala en el teléfono y se entra con tu correo.",
+    url: "cuentas/"
   },
   {
     nombre: "Visitas",
@@ -50,10 +55,10 @@ const MODULOS = [
   }
 ];
 
-/* Lo que vive en otro lado y se enlaza nomás. */
+/* Lo que vive en otro lado y se enlaza nomás. Aplica el mismo `enObra`. */
 const OTRAS = [
-  { nombre: "Cotizador de vidriería", url: "https://cvargas-bubba.github.io/cotizador-vidrieria/" },
-  { nombre: "Transcriptor", url: "https://cvargas-bubba.github.io/transcriptor/" }
+  { nombre: "Cotizador de vidriería", url: "https://cvargas-bubba.github.io/cotizador-vidrieria/", enObra: true },
+  { nombre: "Transcriptor", url: "https://cvargas-bubba.github.io/transcriptor/", enObra: true }
 ];
 
 /* ────────────────────────── de acá para abajo, el armado ────────────────── */
@@ -69,16 +74,17 @@ const OTRAS = [
 
   function pintar() {
     const mio = esDueno();
-    const lista = MODULOS.filter((m) => !m.privada || mio);
+    const suya = (m) => !(m.privada || m.enObra) || mio;
+    const lista = MODULOS.filter(suya);
     $("tarjetas").innerHTML = lista.map((m) => `
-      <li class="tarjeta">
+      <li class="tarjeta${m.enObra ? " obra" : ""}">
         <a href="${esc(m.url)}">
           <span class="t-cab">
             <span class="t-n">${esc(m.nombre)}</span>
             ${m.bajada ? `<span class="t-b">${esc(m.bajada)}</span>` : ""}
           </span>
           <span class="t-t">${esc(m.texto)}</span>
-          <span class="t-pie">Abrir</span>
+          <span class="t-pie">${m.enObra ? "En preparación" : "Abrir"}</span>
         </a>
       </li>`).join("");
 
@@ -90,9 +96,10 @@ const OTRAS = [
       ? "Entraste como " + correo() + ". Esta cuenta no tiene aplicaciones acá."
       : "";
 
-    $("otrasSec").hidden = !OTRAS.length;
-    $("otras").innerHTML = OTRAS.map((o) =>
-      `<li><a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.nombre)}</a></li>`).join("");
+    const otras = OTRAS.filter(suya);
+    $("otrasSec").hidden = !otras.length;
+    $("otras").innerHTML = otras.map((o) =>
+      `<li><a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.nombre)}${o.enObra ? " <span class=\"obra-nota\">en preparación</span>" : ""}</a></li>`).join("");
 
     const c = correo();
     $("sesionQuien").hidden = !c;
