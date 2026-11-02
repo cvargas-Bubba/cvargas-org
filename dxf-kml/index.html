@@ -1,0 +1,2521 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversor DXF a KML</title>
+<meta name="description" content="Convierte planos DXF de AutoCAD a KML para Google Earth, directamente en el navegador.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+:root{
+  --bg:#f4f5f2; --panel:#ffffff; --ink:#1d2320; --muted:#5f6b66; --line:#dde2de;
+  --accent:#0f766e; --accent-ink:#ffffff; --accent-soft:#e3f2ef;
+  --warn-bg:#fff4d6; --warn-ink:#6b4400; --err-bg:#fde8e8; --err-ink:#8a1c1c; --info-bg:#eaf0f6; --info-ink:#2c3e57;
+  --radius:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+.app{display:grid;grid-template-columns:minmax(340px,420px) 1fr;height:100vh}
+aside{overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:20px 22px 28px}
+main{position:relative;min-height:0}
+#map{position:absolute;inset:0;background:#dfe5e1}
+.map-empty{position:absolute;inset:0;display:grid;place-items:center;z-index:500;pointer-events:none}
+.map-empty span{background:rgba(255,255,255,.94);padding:10px 16px;border-radius:999px;color:var(--muted);box-shadow:0 1px 4px rgba(0,0,0,.15)}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 16px}
+.step{border-top:1px solid var(--line);padding:16px 0}
+.step h2{font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 10px;display:flex;gap:8px;align-items:center}
+.num{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:11px;letter-spacing:0}
+details summary{cursor:pointer;font-weight:600}
+ol{margin:8px 0 0;padding-left:20px}
+ol li{margin:3px 0}
+kbd{font:12px ui-monospace,Consolas,monospace;background:#eef0ed;border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.drop{display:block;border:2px dashed #b9c4be;border-radius:var(--radius);padding:22px 14px;text-align:center;cursor:pointer;transition:background .15s,border-color .15s;background:#fafbf9}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{display:block;font-size:15px}
+.drop small{color:var(--muted)}
+.file-name{margin-top:8px;font-weight:600;word-break:break-all}
+select,textarea,input[type=number]{width:100%;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+textarea{font:12px ui-monospace,Consolas,monospace;min-height:64px;margin-top:8px;resize:vertical}
+.hint{color:var(--muted);font-size:12.5px;margin:6px 0 0}
+.msgs{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.msgs:empty{display:none}
+.msg{padding:9px 11px;border-radius:8px;font-size:13px}
+.msg.warn{background:var(--warn-bg);color:var(--warn-ink)}
+.msg.err{background:var(--err-bg);color:var(--err-ink)}
+.msg.info{background:var(--info-bg);color:var(--info-ink)}
+.msg .linkbtn{display:block;margin-top:5px;font-weight:600;color:inherit;text-decoration:underline}
+.layers{max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:8px}
+.layers .empty{padding:10px;color:var(--muted)}
+.layer{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);cursor:pointer}
+.layer:last-child{border-bottom:0}
+.layer:hover{background:#f7f8f6}
+.sw{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.3);flex:none}
+.layer .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.layer .count{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+.tag{font-size:11px;color:var(--muted);background:#eef0ed;border-radius:4px;padding:0 5px}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px}
+.linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0}
+.opt{display:flex;gap:8px;align-items:flex-start;margin:7px 0;cursor:pointer}
+.opt input{margin-top:3px}
+.inline{display:flex;align-items:center;gap:10px;margin-top:10px}
+.inline input{width:80px}
+.btn{display:block;width:100%;padding:12px;border:0;border-radius:var(--radius);background:var(--accent);color:var(--accent-ink);font-family:inherit;font-size:15px;font-weight:600;cursor:pointer}
+.btn:hover:not(:disabled){filter:brightness(1.08)}
+.btn:disabled{background:#b9c4be;cursor:not-allowed}
+.summary{color:var(--muted);text-align:center;margin-top:8px;font-size:12.5px}
+.foot{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:14px;margin:0}
+.field-label{display:block;font-size:12.5px;font-weight:600;margin:12px 0 4px}
+.detect{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;background:#f6faf9}
+.detect.warn{border-left-color:#c58f00;background:var(--warn-bg)}
+.detect-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--accent);color:#fff;border-radius:4px;padding:2px 6px}
+.detect.warn .chip{background:#a87800}
+.detect p{margin:6px 0 0;font-size:13px}
+.detect .detect-note{color:var(--muted);font-size:12.5px}
+.detect .linkbtn{margin-top:6px;font-weight:600}
+.local{margin-top:12px;border:1px solid var(--line);border-radius:8px;padding:4px 12px 12px;background:#fafbf9}
+.cp{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;margin-top:12px}
+.cp-title{grid-column:1/-1;font-weight:600;font-size:12.5px}
+.cp-title span{font-weight:400;color:var(--muted)}
+.cp label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
+.cp input{width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+.cp input:read-only{background:#eef0ed;color:var(--muted)}
+.zones{margin-top:10px;border:1px solid #e6cf8a;background:var(--warn-bg);border-radius:8px;padding:10px 12px}
+.zones strong{font-size:13px}
+.zone-opt{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px solid rgba(0,0,0,.07);cursor:pointer;font-size:13px}
+.zone-opt:first-child{border-top:0}
+.zone-opt input{margin-top:3px}
+.zone-opt small{display:block;color:var(--muted);font-size:12px;word-break:break-word}
+.cp-actions{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
+.coordhint{margin-top:10px;border:1px solid #bfe3dc;background:var(--accent-soft);border-radius:8px;padding:8px 10px;font-size:12.5px;word-break:break-word}
+.coordhint .cp-actions{margin-top:6px}
+.pick{font:inherit;font-size:12px;padding:4px 8px;border:1px solid var(--accent);color:var(--accent);background:#fff;border-radius:6px;cursor:pointer}
+.pick:hover{background:var(--accent-soft)}
+.pick.active{background:var(--accent);color:#fff}
+#drawmap{position:absolute;inset:0;background:#1f2622}
+.viewtabs{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:800;display:flex;background:#fff;border-radius:999px;box-shadow:0 1px 5px rgba(0,0,0,.25);overflow:hidden}
+.viewtabs button{font:inherit;font-size:13px;font-weight:600;border:0;background:none;padding:7px 16px;cursor:pointer;color:var(--muted)}
+.viewtabs button.on{background:var(--accent);color:#fff}
+.pickbar{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);z-index:800;background:#1d2320;color:#fff;border-radius:10px;padding:9px 12px;display:flex;gap:12px;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,.35);width:max-content;max-width:calc(100% - 24px);font-size:13px}
+.pickbar button{font:inherit;font-size:12px;border:1px solid rgba(255,255,255,.5);background:none;color:#fff;border-radius:6px;padding:3px 8px;cursor:pointer;flex:none}
+.picking .leaflet-container,.picking .leaflet-interactive{cursor:crosshair!important}
+.leaflet-tooltip.zone-label{background:rgba(255,255,255,.92);border:0;font-weight:600;box-shadow:none}
+.leaflet-tooltip.cp-label{background:#0f766e;color:#fff;border:0;font-weight:700;padding:1px 6px;box-shadow:none}
+.opt-sub{display:flex;align-items:center;gap:8px;margin:0 0 8px 24px;font-size:13px}
+.opt-sub select{width:auto;padding:4px 6px}
+.shift{margin-top:12px;border:1px solid var(--line);border-radius:8px;padding:4px 12px 10px;background:#fafbf9}
+.shift-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:320px;margin-top:6px}
+.shift-pad select{width:100%;padding:4px 6px}
+.shift-pad .pick{width:100%}
+.imgnote{position:absolute;left:10px;bottom:28px;z-index:700;max-width:360px;background:rgba(255,255,255,.93);border-radius:8px;padding:6px 10px;font-size:12px;line-height:1.35;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.hidden{display:none!important}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr;height:auto}
+  aside{border-right:0;overflow:visible}
+  main{height:65vh}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside>
+  <h1>Conversor DXF → KML</h1>
+  <p class="sub">Convierte planos de AutoCAD a KML para Google Earth. El archivo se procesa en tu navegador y <b>no se sube a ningún servidor</b>.</p>
+
+  <section class="step">
+    <h2><span class="num">1</span>Exporta el plano desde AutoCAD</h2>
+    <details id="howto" open>
+      <summary>¿Cómo guardo el DWG como DXF?</summary>
+      <ol>
+        <li>Abre el plano (.dwg) en AutoCAD.</li>
+        <li>Escribe <kbd>GUARDARCOMO</kbd> (<kbd>SAVEAS</kbd> en inglés) o ve a <b>Archivo → Guardar como</b>.</li>
+        <li>En <b>Tipo de archivo</b> elige <b>AutoCAD 2018 DXF (*.dxf)</b>.</li>
+        <li>Guarda y sube ese archivo aquí abajo.</li>
+      </ol>
+      <p class="hint">El plano debe estar dibujado en coordenadas reales (UTM o geográficas). Si usa coordenadas locales, el KML no quedará bien ubicado.</p>
+    </details>
+  </section>
+
+  <section class="step">
+    <h2><span class="num">2</span>Sube el archivo DXF</h2>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".dxf,.dwg" hidden>
+      <strong>Arrastra el DXF aquí</strong>
+      <small>o haz clic para elegirlo</small>
+    </label>
+    <div class="file-name hidden" id="fileName"></div>
+    <div class="zones hidden" id="zonesBox">
+      <strong id="zonesTitle"></strong>
+      <p class="hint">Convierte cada uno por separado. Si mezclas, por ejemplo, la situación actual, la propuesta y un croquis sin escala, el KML mostrará el lote repetido o deformado.</p>
+      <div id="zoneList"></div>
+      <button type="button" class="linkbtn" id="zoneDraw">Marcar otra zona en el dibujo</button>
+    </div>
+    <div class="msgs" id="msgs"></div>
+  </section>
+
+  <section class="step">
+    <h2><span class="num">3</span>Sistema de coordenadas del plano</h2>
+    <div class="detect hidden" id="detect">
+      <div class="detect-top"><span class="chip" id="detectChip"></span><strong id="detectTitle"></strong></div>
+      <p id="detectReason"></p>
+      <p class="detect-note hidden" id="detectNote"></p>
+      <button type="button" class="linkbtn hidden" id="detectReset">Usar el sistema detectado</button>
+    </div>
+    <label class="field-label" for="crs">Sistema usado para convertir</label>
+    <select id="crs"></select>
+    <p class="hint" id="crsHint"></p>
+    <textarea id="customDef" class="hidden" spellcheck="false" placeholder="+proj=utm +zone=19 +south +datum=WGS84 +units=m +no_defs"></textarea>
+    <div class="local hidden" id="localPanel">
+      <label class="field-label" for="localTarget">Sistema real de los puntos de control</label>
+      <select id="localTarget"></select>
+      <p class="hint">Usa puntos que reconozcas en el plano y cuya coordenada real conozcas (vértices, PR, puntos GPS). Escríbelos o elígelos con los botones: la X,Y en el dibujo y el Este/Norte en el mapa satelital. Si los escribes, hazlo sin separador de miles, por ejemplo <kbd>346485,12</kbd>.</p>
+      <div class="coordhint hidden" id="coordHint">
+        <div><strong>El plano indica una coordenada real:</strong> <span id="coordHintText"></span></div>
+        <div class="cp-actions"><button type="button" class="pick" id="coordUse">Usar como Este/Norte del punto 1</button><button type="button" class="pick" id="coordShow">Ver en el mapa</button></div>
+      </div>
+      <div class="cp">
+        <div class="cp-title">Punto de control 1</div>
+        <div class="cp-actions"><button type="button" class="pick" data-pick="1" data-what="draw">Elegir X,Y en el dibujo</button><button type="button" class="pick" data-pick="1" data-what="map">Elegir Este/Norte en el mapa</button></div>
+        <label>X en el dibujo<input id="p1x" inputmode="decimal" autocomplete="off"></label>
+        <label>Y en el dibujo<input id="p1y" inputmode="decimal" autocomplete="off"></label>
+        <label>Este real<input id="p1e" inputmode="decimal" autocomplete="off"></label>
+        <label>Norte real<input id="p1n" inputmode="decimal" autocomplete="off"></label>
+      </div>
+      <div class="cp">
+        <div class="cp-title">Punto de control 2 <span>(recomendado: calcula giro y escala)</span></div>
+        <div class="cp-actions"><button type="button" class="pick" data-pick="2" data-what="draw">Elegir X,Y en el dibujo</button><button type="button" class="pick" data-pick="2" data-what="map">Elegir Este/Norte en el mapa</button></div>
+        <label>X en el dibujo<input id="p2x" inputmode="decimal" autocomplete="off"></label>
+        <label>Y en el dibujo<input id="p2y" inputmode="decimal" autocomplete="off"></label>
+        <label>Este real<input id="p2e" inputmode="decimal" autocomplete="off"></label>
+        <label>Norte real<input id="p2n" inputmode="decimal" autocomplete="off"></label>
+      </div>
+      <div class="cp">
+        <label>Giro (°, antihorario)<input id="lRot" inputmode="decimal" value="0" autocomplete="off"></label>
+        <label>Escala<input id="lScale" inputmode="decimal" value="1" autocomplete="off"></label>
+        <div class="cp-actions" id="nudgeBtns">
+          <button type="button" class="pick" data-nudge="-1">−1°</button>
+          <button type="button" class="pick" data-nudge="-0.1">−0,1°</button>
+          <button type="button" class="pick" data-nudge="0.1">+0,1°</button>
+          <button type="button" class="pick" data-nudge="1">+1°</button>
+        </div>
+      </div>
+      <div class="coordhint hidden" id="northHint">
+        <div id="northText"></div>
+        <div class="cp-actions" id="northBtns"></div>
+      </div>
+      <p class="hint" id="localInfo"></p>
+    </div>
+    <div class="shift hidden" id="shiftBox">
+      <label class="field-label">Ajuste fino de posición</label>
+      <div class="shift-pad">
+        <span></span><button type="button" class="pick" data-shift="0,1">↑ Norte</button><span></span>
+        <button type="button" class="pick" data-shift="-1,0">← Oeste</button>
+        <select id="shiftStep" aria-label="Paso del ajuste"><option value="0.5">0,5 m</option><option value="1" selected>1 m</option><option value="5">5 m</option></select>
+        <button type="button" class="pick" data-shift="1,0">Este →</button>
+        <span></span><button type="button" class="pick" data-shift="0,-1">↓ Sur</button><span></span>
+      </div>
+      <p class="hint"><span id="shiftText">Sin desplazamiento</span> <button type="button" class="linkbtn hidden" id="shiftReset">Quitar</button></p>
+      <p class="hint">Mueve todo el dibujo, en la vista previa y en el KML, para calzarlo con la imagen que usarás (por ejemplo, la de Google Earth). Los marcadores P1 y P2 se quedan en las coordenadas ingresadas.</p>
+    </div>
+    <p class="hint">Revisa la vista previa: si el dibujo no cae donde corresponde, prueba otra zona o datum.</p>
+  </section>
+
+  <section class="step">
+    <h2><span class="num">4</span>Capas a exportar</h2>
+    <div class="row hidden" id="layerTools"><span class="hint" id="layerCount" style="margin:0"></span><span><button class="linkbtn" id="allOn" type="button">Todas</button> · <button class="linkbtn" id="allOff" type="button">Ninguna</button></span></div>
+    <div class="layers" id="layers"><div class="empty">Sube un archivo para ver sus capas.</div></div>
+  </section>
+
+  <section class="step">
+    <h2><span class="num">5</span>Opciones</h2>
+    <label class="opt"><input type="checkbox" id="optTexts" checked><span>Incluir textos como etiquetas</span></label>
+    <label class="opt"><input type="checkbox" id="optExpand" checked><span>Dibujar el contenido de los bloques</span></label>
+    <label class="opt"><input type="checkbox" id="optBlockPts"><span>Agregar un punto por cada bloque (con sus atributos)</span></label>
+    <label class="opt"><input type="checkbox" id="optPolys" checked><span>Figuras cerradas como polígonos con relleno</span></label>
+    <label class="opt-sub">Color del relleno <select id="optFill"><option value="auto" selected>Un color distinto por figura</option><option value="line">El color de la línea del plano</option></select></label>
+    <label class="opt"><input type="checkbox" id="optFaces" checked><span>Armar figuras con l&iacute;neas sueltas (servidumbres, franjas)</span></label>
+    <label class="opt"><input type="checkbox" id="optMeasure" checked><span>Agregar longitud y superficie en la descripción</span></label>
+    <div class="inline"><span>Grosor de línea</span><input type="number" id="optWidth" min="0.5" max="10" step="0.5" value="2"></div>
+  </section>
+
+  <section class="step">
+    <button class="btn" id="download" type="button" disabled>Descargar KML</button>
+    <div class="summary" id="summary">Sube un archivo para comenzar.</div>
+  </section>
+
+  <p class="foot">Se leen líneas, polilíneas, arcos, círculos, elipses, splines, puntos, textos y bloques del espacio modelo. Se omiten sombreados, cotas y referencias externas.</p>
+</aside>
+<main id="main">
+  <div id="map"></div>
+  <div id="drawmap" class="hidden"></div>
+  <div class="imgnote hidden" id="imgNote">La imagen de fondo (Esri) puede diferir algunos metros de la de Google Earth. Si el KML se ve corrido all&aacute;, usa el <b>ajuste fino de posici&oacute;n</b> del paso 3.</div>
+  <div class="map-empty" id="mapEmpty"><span>La vista previa aparecerá aquí</span></div>
+  <div class="viewtabs hidden" id="viewTabs">
+    <button type="button" data-view="map" class="on">Mapa</button>
+    <button type="button" data-view="draw">Dibujo</button>
+  </div>
+  <div class="pickbar hidden" id="pickBar"><span id="pickText"></span><button type="button" id="pickCancel">Cancelar</button></div>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.12.1/proj4.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+(function () {
+'use strict';
+
+const $ = id => document.getElementById(id);
+const TAU = Math.PI * 2;
+const DEG = Math.PI / 180;
+
+// ---------------------------------------------------------------------------
+// Sistemas de coordenadas
+// ---------------------------------------------------------------------------
+const CRS_LIST = [
+  { id: 'wgs84-19s', label: 'WGS84 / UTM zona 19S (EPSG:32719)', def: '+proj=utm +zone=19 +south +datum=WGS84 +units=m +no_defs', hint: 'La más usada: norte y centro de Chile (entre 72° y 66° O).' },
+  { id: 'wgs84-18s', label: 'WGS84 / UTM zona 18S (EPSG:32718)', def: '+proj=utm +zone=18 +south +datum=WGS84 +units=m +no_defs', hint: 'Sur de Chile y costa al oeste de 72° O (Chiloé, Aysén, parte de Magallanes).' },
+  { id: 'sirgas-19s', label: 'SIRGAS-Chile / UTM zona 19S (EPSG:5362)', def: '+proj=utm +zone=19 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', hint: 'Datum oficial actual. En la práctica coincide con WGS84 (diferencias de centímetros).' },
+  { id: 'sirgas-18s', label: 'SIRGAS-Chile / UTM zona 18S (EPSG:5361)', def: '+proj=utm +zone=18 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', hint: 'Datum oficial actual. En la práctica coincide con WGS84 (diferencias de centímetros).' },
+  { id: 'psad56-19s', label: 'PSAD56 / UTM zona 19S (EPSG:24879)', def: '+proj=utm +zone=19 +south +ellps=intl +towgs84=-288,175,-376,0,0,0,0 +units=m +no_defs', hint: 'Datum antiguo (planos anteriores a ~2000). Queda varios cientos de metros desplazado respecto de WGS84.' },
+  { id: 'psad56-18s', label: 'PSAD56 / UTM zona 18S (EPSG:24878)', def: '+proj=utm +zone=18 +south +ellps=intl +towgs84=-288,175,-376,0,0,0,0 +units=m +no_defs', hint: 'Datum antiguo (planos anteriores a ~2000). Queda varios cientos de metros desplazado respecto de WGS84.' },
+  { id: 'sad69-19s', label: 'SAD69 / UTM zona 19S (EPSG:29189)', def: '+proj=utm +zone=19 +south +ellps=aust_SA +towgs84=-66.87,4.37,-38.52,0,0,0,0 +units=m +no_defs', hint: 'Datum antiguo. Queda unas decenas de metros desplazado respecto de WGS84.' },
+  { id: 'sad69-18s', label: 'SAD69 / UTM zona 18S (EPSG:29188)', def: '+proj=utm +zone=18 +south +ellps=aust_SA +towgs84=-66.87,4.37,-38.52,0,0,0,0 +units=m +no_defs', hint: 'Datum antiguo. Queda unas decenas de metros desplazado respecto de WGS84.' },
+  { id: 'wgs84-12s', label: 'WGS84 / UTM zona 12S, Isla de Pascua (EPSG:32712)', def: '+proj=utm +zone=12 +south +datum=WGS84 +units=m +no_defs', hint: 'Isla de Pascua.' },
+  { id: 'wgs84-17s', label: 'WGS84 / UTM zona 17S, Juan Fernández (EPSG:32717)', def: '+proj=utm +zone=17 +south +datum=WGS84 +units=m +no_defs', hint: 'Archipiélago Juan Fernández e islas Desventuradas.' },
+  { id: 'webmerc', label: 'Web Mercator (EPSG:3857)', def: 'EPSG:3857', noMeasure: true, hint: 'Proyección de mapas web. Sus distancias no son reales, así que no se calculan longitudes ni superficies.' },
+  { id: 'geo', label: 'Coordenadas geográficas en grados (WGS84)', def: null, hint: 'El dibujo ya está en longitud (X) y latitud (Y).' },
+  { id: 'local', label: 'Coordenadas locales (ubicar con puntos de control)', def: null, hint: 'El plano usa un origen propio. Indica uno o dos puntos con sus coordenadas reales para ubicarlo.' },
+  { id: 'custom', label: 'Otro sistema (definición proj4)…', def: null, hint: 'Pega la definición proj4 del sistema; la encuentras en epsg.io buscando el código EPSG.' },
+];
+
+const EPSG_IDS = { 32719: 'wgs84-19s', 32718: 'wgs84-18s', 32717: 'wgs84-17s', 32712: 'wgs84-12s', 5362: 'sirgas-19s', 5361: 'sirgas-18s', 24879: 'psad56-19s', 24878: 'psad56-18s', 29189: 'sad69-19s', 29188: 'sad69-18s', 4326: 'geo', 3857: 'webmerc' };
+const UTM_IDS = {
+  wgs84: { 19: 'wgs84-19s', 18: 'wgs84-18s', 17: 'wgs84-17s', 12: 'wgs84-12s' },
+  sirgas: { 19: 'sirgas-19s', 18: 'sirgas-18s' },
+  psad56: { 19: 'psad56-19s', 18: 'psad56-18s' },
+  sad69: { 19: 'sad69-19s', 18: 'sad69-18s' },
+};
+const familyOf = id => (/^(wgs84|sirgas|psad56|sad69)-\d+s$/.exec(id || '') || [])[1] || null;
+const zoneOf = id => { const m = /-(\d+)s$/.exec(id || ''); return m ? +m[1] : null; };
+const utmId = (fam, zone) => (UTM_IDS[fam] && UTM_IDS[fam][zone]) || UTM_IDS.wgs84[zone];
+
+class UserError extends Error {}
+
+// ---------------------------------------------------------------------------
+// Utilidades
+// ---------------------------------------------------------------------------
+const num = (v, d = 0) => { const x = parseFloat(v); return Number.isFinite(x) ? x : d; };
+const int = (v, d = 0) => { const x = parseInt(v, 10); return Number.isFinite(x) ? x : d; };
+const fmt = (x, dec = 2) => x.toLocaleString('es-CL', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const byName = (a, b) => a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' });
+function storeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function storeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } }
+
+// ---------------------------------------------------------------------------
+// Colores AutoCAD (ACI) → hex
+// ---------------------------------------------------------------------------
+const hex2 = n => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+const rgbHex = (r, g, b) => '#' + hex2(r) + hex2(g) + hex2(b);
+function hsvHex(h, s, v) {
+  const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return rgbHex(f(5) * 255, f(3) * 255, f(1) * 255);
+}
+const ACI_BASE = [null, '#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#ff00ff', '#ffffff', '#808080', '#c0c0c0'];
+function aciHex(i) {
+  i = Math.abs(i);
+  if (i >= 1 && i <= 9) return ACI_BASE[i];
+  if (i >= 250 && i <= 255) { const g = [51, 91, 132, 173, 214, 255][i - 250]; return rgbHex(g, g, g); }
+  if (i >= 10 && i <= 249) {
+    const sub = (i - 10) % 10;
+    return hsvHex(Math.floor((i - 10) / 10) * 15, sub % 2 ? 0.5 : 1, [1, 0.65, 0.5, 0.3, 0.15][sub >> 1]);
+  }
+  return '#ffffff';
+}
+const tcHex = v => rgbHex((v >> 16) & 255, (v >> 8) & 255, v & 255);
+
+// ---------------------------------------------------------------------------
+// Lectura del DXF
+// ---------------------------------------------------------------------------
+function decodeFile(buf) {
+  const bytes = new Uint8Array(buf);
+  const head = String.fromCharCode.apply(null, bytes.subarray(0, 22));
+  if (head.startsWith('AutoCAD Binary DXF')) throw new UserError('Este DXF está guardado en formato binario. En AutoCAD, en el cuadro Guardar como, entra a Herramientas → Opciones → Opciones DXF, elige formato ASCII y vuelve a guardar.');
+  if (/^AC10\d\d/.test(head)) throw new UserError('Este archivo es un DWG con extensión cambiada. Ábrelo en AutoCAD y usa Guardar como → AutoCAD 2018 DXF (*.dxf).');
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+  catch (e) { text = new TextDecoder('windows-1252').decode(bytes); }
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  return text;
+}
+
+// Pares (código de grupo, valor). Los textos (códigos 1 y 3) se conservan sin recortar.
+function readPairs(text) {
+  const lines = text.split(/\r\n|\n|\r/);
+  const codes = [], vals = [];
+  const n = lines.length;
+  let i = 0;
+  while (i + 1 < n) {
+    const c = lines[i].trim();
+    if (!/^-?\d{1,4}$/.test(c)) { i++; continue; }
+    const code = +c;
+    codes.push(code);
+    vals.push(code === 1 || code === 3 || code === 301 || code === 303 ? lines[i + 1] : lines[i + 1].trim());
+    i += 2;
+  }
+  return { codes, vals };
+}
+
+function records(P, s, e) {
+  const out = [];
+  let cur = null;
+  for (let i = s; i < e; i++) {
+    if (P.codes[i] === 0) {
+      if (cur) cur.e = i;
+      cur = { type: P.vals[i], s: i + 1, e };
+      out.push(cur);
+    }
+  }
+  return out;
+}
+
+function fields(P, r) {
+  const f = new Map();
+  for (let i = r.s; i < r.e; i++) if (!f.has(P.codes[i])) f.set(P.codes[i], P.vals[i]);
+  return f;
+}
+
+function parseDxf(text) {
+  const P = readPairs(text);
+  const { codes, vals } = P;
+  const n = codes.length;
+  if (!n) throw new UserError('El archivo está vacío o no es un DXF válido.');
+  const dxf = { insunits: 0, layers: new Map(), blocks: new Map(), entities: [], inserts: [], skipped: {}, geo: null };
+  let found = false;
+  for (let i = 0; i < n;) {
+    if (codes[i] === 0 && vals[i] === 'SECTION' && codes[i + 1] === 2) {
+      const name = vals[i + 1];
+      const s = i + 2;
+      let e = s;
+      while (e < n && !(codes[e] === 0 && vals[e] === 'ENDSEC')) e++;
+      found = true;
+      if (name === 'HEADER') parseHeader(P, s, e, dxf);
+      else if (name === 'TABLES') parseTables(P, s, e, dxf);
+      else if (name === 'BLOCKS') parseBlocks(P, s, e, dxf);
+      else if (name === 'ENTITIES') {
+        const recs = records(P, s, e);
+        dxf.entities = interpret(P, recs, dxf.skipped, true);
+        dxf.inserts = collectInserts(P, recs);
+      }
+      else if (name === 'OBJECTS') dxf.geo = parseGeoData(P, records(P, s, e));
+      i = e + 1;
+    } else i++;
+  }
+  if (!found) throw new UserError('No se reconoce el contenido como un DXF de AutoCAD.');
+  return dxf;
+}
+
+function parseHeader(P, s, e, dxf) {
+  for (let i = s; i < e; i++) {
+    if (P.codes[i] === 9 && P.vals[i] === '$INSUNITS' && P.codes[i + 1] === 70) dxf.insunits = int(P.vals[i + 1]);
+  }
+}
+
+function parseTables(P, s, e, dxf) {
+  for (const r of records(P, s, e)) {
+    if (r.type !== 'LAYER') continue;
+    const f = fields(P, r);
+    const name = f.get(2);
+    if (name == null) continue;
+    const aci = int(f.get(62), 7);
+    dxf.layers.set(name, {
+      color: f.has(420) ? tcHex(int(f.get(420))) : aciHex(aci || 7),
+      off: aci < 0,
+      frozen: (int(f.get(70)) & 1) === 1,
+    });
+  }
+}
+
+function parseBlocks(P, s, e, dxf) {
+  const recs = records(P, s, e);
+  for (let k = 0; k < recs.length; k++) {
+    if (recs[k].type !== 'BLOCK') continue;
+    const f = fields(P, recs[k]);
+    let j = k + 1;
+    while (j < recs.length && recs[j].type !== 'ENDBLK') j++;
+    const name = f.get(2) || '';
+    const xref = (int(f.get(70)) & 4) !== 0;
+    if (!/^\*(model|paper)_space/i.test(name)) {
+      dxf.blocks.set(name, {
+        base: [num(f.get(10)), num(f.get(20))],
+        xref,
+        ents: xref ? [] : interpret(P, recs.slice(k + 1, j), {}, false),
+      });
+    }
+    k = j;
+  }
+}
+
+// Ubicación geográfica asignada en AutoCAD (objeto GEODATA).
+function parseGeoData(P, recs) {
+  for (const r of recs) {
+    if (r.type !== 'GEODATA') continue;
+    const f = fields(P, r);
+    let xml = '';
+    for (let i = r.s; i < r.e; i++) if (P.codes[i] === 301 || P.codes[i] === 303) xml += P.vals[i];
+    const epsg = /<Alias[^>]*id="(\d{4,5})"[^>]*type="CoordinateSystem"[^>]*>[\s\S]*?<Namespace>\s*EPSG Code\s*<\/Namespace>/i.exec(xml);
+    const name = /<(?:Projected|Geographic)CoordinateSystem[^>]*id="([^"]+)"/i.exec(xml) || /<ObjectId>([^<]+)<\/ObjectId>/i.exec(xml);
+    return {
+      version: int(f.get(90)),
+      type: int(f.get(70)),
+      design: f.has(10) ? [num(f.get(10)), num(f.get(20))] : null,
+      ref: f.has(11) ? [num(f.get(11)), num(f.get(21))] : null,
+      scale: num(f.get(40), 1) || 1,
+      north: [num(f.get(12), 0), num(f.get(22), 1)],
+      epsg: epsg ? +epsg[1] : null,
+      name: name ? name[1].trim() : null,
+    };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Geometría
+// ---------------------------------------------------------------------------
+function arcPts(cx, cy, r, a0, a1) {
+  const nseg = Math.max(4, Math.ceil((a1 - a0) / TAU * 72));
+  const out = [];
+  for (let s = 0; s <= nseg; s++) {
+    const a = a0 + (a1 - a0) * s / nseg;
+    out.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  return out;
+}
+
+// Puntos intermedios del arco definido por un "bulge" entre dos vértices.
+function bulgeArc(out, a, c, b) {
+  const dx = c.x - a.x, dy = c.y - a.y, chord = Math.hypot(dx, dy);
+  if (chord < 1e-12) return;
+  const theta = 4 * Math.atan(b);
+  const h = (chord / 2) / Math.tan(theta / 2);
+  const cx = (a.x + c.x) / 2 - dy / chord * h;
+  const cy = (a.y + c.y) / 2 + dx / chord * h;
+  const r = Math.hypot(a.x - cx, a.y - cy);
+  const a0 = Math.atan2(a.y - cy, a.x - cx);
+  const nseg = Math.max(2, Math.ceil(Math.abs(theta) / TAU * 72));
+  for (let k = 1; k < nseg; k++) {
+    const ang = a0 + theta * k / nseg;
+    out.push([cx + r * Math.cos(ang), cy + r * Math.sin(ang)]);
+  }
+}
+
+function bulgePath(verts, closed) {
+  const n = verts.length, pts = [];
+  if (!n) return pts;
+  pts.push([verts[0].x, verts[0].y]);
+  const segs = closed ? n : n - 1;
+  for (let i = 0; i < segs; i++) {
+    const a = verts[i], c = verts[(i + 1) % n];
+    if (Math.abs(a.b) > 1e-9) bulgeArc(pts, a, c, a.b);
+    pts.push([c.x, c.y]);
+  }
+  return pts;
+}
+
+// Evaluación de B-spline racional (algoritmo de De Boor).
+function bspline(ctrl, knots, p, w) {
+  const n = ctrl.length;
+  const t0 = knots[p], t1 = knots[n];
+  const samples = Math.min(4000, Math.max(32, n * 10));
+  const out = [];
+  for (let s = 0; s <= samples; s++) {
+    const t = t0 + (t1 - t0) * s / samples;
+    let k = p;
+    while (k < n - 1 && knots[k + 1] <= t) k++;
+    const d = [];
+    for (let j = 0; j <= p; j++) {
+      const c = ctrl[j + k - p], wt = w ? w[j + k - p] : 1;
+      d.push([c[0] * wt, c[1] * wt, wt]);
+    }
+    for (let r = 1; r <= p; r++) {
+      for (let j = p; j >= r; j--) {
+        const den = knots[j + 1 + k - r] - knots[j + k - p];
+        const a = den ? (t - knots[j + k - p]) / den : 0;
+        for (let q = 0; q < 3; q++) d[j][q] = (1 - a) * d[j - 1][q] + a * d[j][q];
+      }
+    }
+    const h = d[p];
+    if (h[2]) out.push([h[0] / h[2], h[1] / h[2]]);
+  }
+  return out;
+}
+
+function cleanText(s, mtext) {
+  s = s.replace(/\\U\+([0-9A-Fa-f]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/\^I/g, ' ').replace(/\^J/g, '\n'); // tabulador y salto de línea en notación de AutoCAD
+  if (mtext) {
+    // Un solo recorrido: los caracteres escapados (\\ \{ \}) se conservan y los códigos de formato se quitan.
+    s = s.replace(/\\([\\{}])|\\p[^;]*;|\\P|\\~|\\S([^;]*?)[\^#\/]([^;]*);|\\[ACFfHQTWc][^;]*;|\\[LlOoKkNX]|[{}]/g,
+      (m, lit, top, bottom) => lit ? lit : m === '\\P' ? '\n' : m === '\\~' ? ' ' : top !== undefined ? top + '/' + bottom : '');
+  }
+  return s.replace(/%%[cC]/g, 'Ø').replace(/%%[dD]/g, '°').replace(/%%[pP]/g, '±')
+    .replace(/%%(\d{3})/g, (_, d) => String.fromCharCode(+d))
+    .replace(/%%[uUoOkK]/g, '').replace(/%%%/g, '%');
+}
+
+const LABELS = { LINE: 'Línea', LWPOLYLINE: 'Polilínea', POLYLINE: 'Polilínea', CIRCLE: 'Círculo', ARC: 'Arco', ELLIPSE: 'Elipse', SPLINE: 'Spline', POINT: 'Punto' };
+const IGNORED = new Set(['VERTEX', 'SEQEND', 'ATTRIB', 'ATTDEF', 'VIEWPORT', 'BLOCK', 'ENDBLK', 'EOF']);
+
+// Convierte los registros crudos en entidades con geometría en coordenadas del bloque/dibujo.
+function interpret(P, recs, skipped, modelOnly) {
+  const out = [];
+  for (let k = 0; k < recs.length; k++) {
+    const r = recs[k], t = r.type;
+    const f = fields(P, r);
+    const hidden = f.get(60) === '1' || (modelOnly && f.get(67) === '1');
+    const flip = num(f.get(230), 1) < 0; // extrusión (0,0,-1): el eje X del OCS queda invertido
+    const fx = p => (flip ? [-p[0], p[1]] : p);
+    let ent = null;
+
+    switch (t) {
+      case 'LINE':
+        ent = { kind: 'line', pts: [[num(f.get(10)), num(f.get(20))], [num(f.get(11)), num(f.get(21))]], closed: false };
+        break;
+
+      case 'LWPOLYLINE': {
+        const verts = [];
+        for (let i = r.s; i < r.e; i++) {
+          const c = P.codes[i];
+          if (c === 10) verts.push({ x: num(P.vals[i]), y: 0, b: 0 });
+          else if (c === 20 && verts.length) verts[verts.length - 1].y = num(P.vals[i]);
+          else if (c === 42 && verts.length) verts[verts.length - 1].b = num(P.vals[i]);
+        }
+        const closed = (int(f.get(70)) & 1) === 1;
+        ent = { kind: 'line', pts: bulgePath(verts, closed).map(fx), closed };
+        break;
+      }
+
+      case 'POLYLINE': {
+        const verts = [];
+        let j = k + 1;
+        while (j < recs.length && recs[j].type === 'VERTEX') {
+          const vf = fields(P, recs[j]);
+          if (!(int(vf.get(70)) & 16)) verts.push({ x: num(vf.get(10)), y: num(vf.get(20)), b: num(vf.get(42)) });
+          j++;
+        }
+        if (j < recs.length && recs[j].type === 'SEQEND') j++;
+        k = j - 1;
+        const flags = int(f.get(70));
+        if (flags & (16 | 64)) { skipped['MESH'] = (skipped['MESH'] || 0) + 1; continue; }
+        const closed = (flags & 1) === 1;
+        const is3d = (flags & 8) !== 0;
+        const pts = bulgePath(is3d ? verts.map(v => ({ x: v.x, y: v.y, b: 0 })) : verts, closed);
+        ent = { kind: 'line', pts: is3d ? pts : pts.map(fx), closed };
+        break;
+      }
+
+      case 'CIRCLE':
+        ent = { kind: 'line', pts: arcPts(num(f.get(10)), num(f.get(20)), num(f.get(40)), 0, TAU).map(fx), closed: true };
+        break;
+
+      case 'ARC': {
+        const a0 = num(f.get(50)) * DEG;
+        let a1 = num(f.get(51)) * DEG;
+        while (a1 <= a0) a1 += TAU;
+        ent = { kind: 'line', pts: arcPts(num(f.get(10)), num(f.get(20)), num(f.get(40)), a0, a1).map(fx), closed: false };
+        break;
+      }
+
+      case 'ELLIPSE': {
+        const cx = num(f.get(10)), cy = num(f.get(20)), mx = num(f.get(11)), my = num(f.get(21)), ratio = num(f.get(40), 1);
+        const nz = flip ? -1 : 1;
+        const vx = -my * ratio * nz, vy = mx * ratio * nz; // eje menor = normal × eje mayor
+        const p0 = num(f.get(41), 0);
+        let p1 = num(f.get(42), TAU);
+        while (p1 <= p0) p1 += TAU;
+        const nseg = Math.max(8, Math.ceil((p1 - p0) / TAU * 96));
+        const pts = [];
+        for (let s = 0; s <= nseg; s++) {
+          const u = p0 + (p1 - p0) * s / nseg;
+          pts.push([cx + Math.cos(u) * mx + Math.sin(u) * vx, cy + Math.cos(u) * my + Math.sin(u) * vy]);
+        }
+        ent = { kind: 'line', pts, closed: Math.abs(p1 - p0 - TAU) < 1e-6 };
+        break;
+      }
+
+      case 'SPLINE': {
+        const ctrl = [], fit = [], knots = [], weights = [];
+        for (let i = r.s; i < r.e; i++) {
+          const c = P.codes[i], v = P.vals[i];
+          if (c === 10) ctrl.push([num(v), 0]);
+          else if (c === 20 && ctrl.length) ctrl[ctrl.length - 1][1] = num(v);
+          else if (c === 11) fit.push([num(v), 0]);
+          else if (c === 21 && fit.length) fit[fit.length - 1][1] = num(v);
+          else if (c === 40) knots.push(num(v));
+          else if (c === 41) weights.push(num(v));
+        }
+        const deg = int(f.get(71), 3);
+        let pts;
+        if (deg >= 1 && ctrl.length > deg && knots.length === ctrl.length + deg + 1) {
+          pts = bspline(ctrl, knots, deg, weights.length === ctrl.length ? weights : null);
+        } else pts = fit.length > 1 ? fit : ctrl;
+        ent = { kind: 'line', pts, closed: (int(f.get(70)) & 1) === 1 };
+        break;
+      }
+
+      case 'POINT':
+        ent = { kind: 'point', pt: [num(f.get(10)), num(f.get(20))] };
+        break;
+
+      case 'TEXT': {
+        const aligned = int(f.get(72)) || int(f.get(73));
+        const pt = aligned && f.has(11) ? [num(f.get(11)), num(f.get(21))] : [num(f.get(10)), num(f.get(20))];
+        const text = cleanText(f.get(1) ?? '', false).trim();
+        if (text) ent = { kind: 'text', pt: fx(pt), text };
+        break;
+      }
+
+      case 'MTEXT': {
+        let raw = '';
+        for (let i = r.s; i < r.e; i++) if (P.codes[i] === 3) raw += P.vals[i];
+        raw += f.get(1) ?? '';
+        const text = cleanText(raw, true).trim();
+        if (text) ent = { kind: 'text', pt: [num(f.get(10)), num(f.get(20))], text };
+        break;
+      }
+
+      case 'INSERT': {
+        const attribs = [];
+        let j = k + 1;
+        while (j < recs.length && recs[j].type === 'ATTRIB') {
+          const af = fields(P, recs[j]);
+          const val = cleanText(af.get(1) ?? '', false).trim();
+          if (val && !(int(af.get(70)) & 1)) attribs.push([af.get(2) ?? '', val]);
+          j++;
+        }
+        if (j > k + 1 && j < recs.length && recs[j].type === 'SEQEND') j++;
+        k = j - 1;
+        ent = {
+          kind: 'insert', block: f.get(2) ?? '',
+          x: num(f.get(10)), y: num(f.get(20)),
+          sx: num(f.get(41), 1), sy: num(f.get(42), 1), rot: num(f.get(50)) * DEG,
+          flip, attribs,
+        };
+        break;
+      }
+
+      default:
+        if (!IGNORED.has(t)) skipped[t] = (skipped[t] || 0) + 1;
+    }
+
+    if (!ent || hidden) continue;
+    if (ent.kind === 'line' && ent.pts.length < 2) continue;
+    // Polilíneas que vuelven a su punto de inicio sin estar marcadas como cerradas (muy común en planos de lotes).
+    if (ent.kind === 'line' && !ent.closed && ent.pts.length >= 4) {
+      const a = ent.pts[0], z = ent.pts[ent.pts.length - 1];
+      let per = 0;
+      for (let i = 1; i < ent.pts.length; i++) per += Math.hypot(ent.pts[i][0] - ent.pts[i - 1][0], ent.pts[i][1] - ent.pts[i - 1][1]);
+      if (per > 0 && Math.hypot(z[0] - a[0], z[1] - a[1]) <= per * 0.0005) ent.closed = true;
+    }
+    ent.layer = f.get(8) ?? '0';
+    ent.aci = f.has(62) ? int(f.get(62), 256) : 256;
+    ent.tc = f.has(420) ? int(f.get(420)) : null;
+    ent.label = LABELS[t] || t;
+    out.push(ent);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Expansión de bloques y colores finales
+// ---------------------------------------------------------------------------
+// Matriz afín [a,b,c,d,e,f]: x' = a·x + c·y + e ; y' = b·x + d·y + f
+const IDENT = [1, 0, 0, 1, 0, 0];
+const mul = (m, n) => [
+  m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1],
+  m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3],
+  m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5],
+];
+const apply = (m, p) => (m === IDENT ? p : [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]]);
+
+function insertMatrix(ins, base) {
+  const cos = Math.cos(ins.rot), sin = Math.sin(ins.rot);
+  const a = cos * ins.sx, b = sin * ins.sx, c = -sin * ins.sy, d = cos * ins.sy;
+  const m = [a, b, c, d, ins.x - a * base[0] - c * base[1], ins.y - b * base[0] - d * base[1]];
+  return ins.flip ? mul([-1, 0, 0, 1, 0, 0], m) : m;
+}
+
+// ---------------------------------------------------------------------------
+// Figuras armadas con líneas sueltas (servidumbres, franjas, lotes dibujados con líneas)
+// ---------------------------------------------------------------------------
+const FACE_LAYER = 'Figuras armadas';
+const polyKey = ft => ft.layer + '|' + ft.pts.length + '|' + ft.pts[0][0] + ',' + ft.pts[0][1];
+
+function ringSignedArea(r) {
+  let a = 0;
+  for (let i = 0; i < r.length; i++) {
+    const p = r[i], q = r[(i + 1) % r.length];
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return a / 2;
+}
+
+// Punto seguro dentro de un anillo antihorario: junto a un borde, hacia su izquierda.
+function interiorPoint(ring, off) {
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], b = ring[(i + 1) % ring.length];
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+    if (len > off * 4) return [(a[0] + b[0]) / 2 - dy / len * off, (a[1] + b[1]) / 2 + dx / len * off];
+  }
+  return ring[0];
+}
+
+// Arma las áreas cerradas que forma la red de líneas (como CONTORNO en AutoCAD).
+// Devuelve las figuras nuevas y las figuras cerradas existentes que quedaron divididas por otras líneas.
+function distToSeg(px, py, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+  const t = l2 ? Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / l2)) : 0;
+  return Math.hypot(px - (a[0] + t * dx), py - (a[1] + t * dy));
+}
+
+function buildFaces(feats) {
+  // Solo alrededor de los lotes: partes de un lote dividido por otras líneas (la servidumbre dentro del lote)
+  // y franjas pegadas a un lote (la servidumbre hacia el camino). Así no se rellenan tablas, croquis ni símbolos.
+  const none = { faces: [], split: [] };
+  const texts = feats.filter(f => f.kind === 'text');
+  const closed = [];
+  for (const ft of feats) {
+    if (ft.kind === 'line' && ft.closed && !ft.derived && ft.pts.length >= 3) {
+      closed.push({ ft, pts: ft.pts, area: Math.abs(ringSignedArea(ft.pts)), box: featBox(ft) });
+    }
+  }
+  if (!closed.length) return none;
+  const maxClosed = Math.max(...closed.map(p => p.area));
+  // Un lote: figura cerrada con un nombre de lote dentro y pocos textos (una tabla tiene muchos)
+  const lots = closed.filter(p => {
+    if (p.area < maxClosed * 0.02) return false;
+    const inside = texts.filter(t => t.pt[0] >= p.box[0] && t.pt[0] <= p.box[2] && t.pt[1] >= p.box[1] && t.pt[1] <= p.box[3] && inPoly(t.pt[0], t.pt[1], p.pts));
+    return inside.length <= 8 && inside.some(t => LOT_WORDS.test(t.text));
+  });
+  if (!lots.length) return none;
+  // Solo las líneas de las capas de los lotes: así, por ejemplo, las curvas de nivel no cortan el lote en bandas
+  const layers = new Set(lots.map(p => p.ft.layer));
+
+  const segs = [];
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  for (const ft of feats) {
+    if (ft.kind !== 'line' || ft.derived || !layers.has(ft.layer)) continue;
+    const p = ft.pts;
+    for (const v of p) {
+      if (v[0] < x1) x1 = v[0];
+      if (v[0] > x2) x2 = v[0];
+      if (v[1] < y1) y1 = v[1];
+      if (v[1] > y2) y2 = v[1];
+    }
+    const n = ft.closed ? p.length : p.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = p[i], b = p[(i + 1) % p.length];
+      if (a[0] !== b[0] || a[1] !== b[1]) segs.push({ a, b });
+    }
+  }
+  if (segs.length < 3 || segs.length > 4000) return none;
+  const size = Math.max(x2 - x1, y2 - y1) || 1;
+  const q = Math.max(size * 2e-6, 1e-4); // tolerancia para unir vértices casi coincidentes
+
+  // 1) puntos de corte de cada segmento (0..1)
+  const cuts = segs.map(() => [0, 1]);
+  for (let i = 0; i < segs.length; i++) {
+    const s = segs[i];
+    const rx = s.b[0] - s.a[0], ry = s.b[1] - s.a[1], lr = Math.hypot(rx, ry);
+    const bx1 = Math.min(s.a[0], s.b[0]) - q, bx2 = Math.max(s.a[0], s.b[0]) + q;
+    const by1 = Math.min(s.a[1], s.b[1]) - q, by2 = Math.max(s.a[1], s.b[1]) + q;
+    for (let j = i + 1; j < segs.length; j++) {
+      const t = segs[j];
+      if (Math.max(t.a[0], t.b[0]) < bx1 || Math.min(t.a[0], t.b[0]) > bx2 || Math.max(t.a[1], t.b[1]) < by1 || Math.min(t.a[1], t.b[1]) > by2) continue;
+      const sx = t.b[0] - t.a[0], sy = t.b[1] - t.a[1], ls = Math.hypot(sx, sy);
+      const px = t.a[0] - s.a[0], py = t.a[1] - s.a[1];
+      const den = rx * sy - ry * sx;
+      if (Math.abs(den) > 1e-9 * lr * ls) {
+        const tt = (px * sy - py * sx) / den, uu = (px * ry - py * rx) / den;
+        if (tt >= -q / lr && tt <= 1 + q / lr && uu >= -q / ls && uu <= 1 + q / ls) {
+          cuts[i].push(Math.min(1, Math.max(0, tt)));
+          cuts[j].push(Math.min(1, Math.max(0, uu)));
+        }
+      } else if (Math.abs(px * ry - py * rx) / lr <= q) {
+        // colineales: cada extremo que cae sobre el otro segmento también es un corte
+        const onSeg = (pt, seg, len, idx) => {
+          const dx = seg.b[0] - seg.a[0], dy = seg.b[1] - seg.a[1];
+          const u = ((pt[0] - seg.a[0]) * dx + (pt[1] - seg.a[1]) * dy) / (len * len);
+          if (u > -q / len && u < 1 + q / len) cuts[idx].push(Math.min(1, Math.max(0, u)));
+        };
+        onSeg(t.a, s, lr, i);
+        onSeg(t.b, s, lr, i);
+        onSeg(s.a, t, ls, j);
+        onSeg(s.b, t, ls, j);
+      }
+    }
+  }
+
+  // 2) grafo plano
+  const nodes = new Map();
+  const node = (x, y) => {
+    const k = Math.round(x / q) + ',' + Math.round(y / q);
+    if (!nodes.has(k)) nodes.set(k, { k, x, y, adj: new Set() });
+    return nodes.get(k);
+  };
+  segs.forEach((s, i) => {
+    const ts = [...new Set(cuts[i].map(v => Math.round(v * 1e9) / 1e9))].sort((a, b) => a - b);
+    let prev = null;
+    for (const tv of ts) {
+      const nd = node(s.a[0] + (s.b[0] - s.a[0]) * tv, s.a[1] + (s.b[1] - s.a[1]) * tv);
+      if (prev && prev !== nd) {
+        prev.adj.add(nd.k);
+        nd.adj.add(prev.k);
+      }
+      prev = nd;
+    }
+  });
+  // quita las ramas que no cierran ningún área
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const nd of nodes.values()) {
+      if (nd.adj.size < 2) {
+        for (const k of nd.adj) nodes.get(k).adj.delete(nd.k);
+        nodes.delete(nd.k);
+        changed = true;
+      }
+    }
+  }
+
+  // 3) recorre las caras dejando el área a la izquierda (antihorario = área positiva)
+  const around = new Map();
+  for (const nd of nodes.values()) {
+    around.set(nd.k, [...nd.adj].map(k => nodes.get(k))
+      .sort((a, b) => Math.atan2(a.y - nd.y, a.x - nd.x) - Math.atan2(b.y - nd.y, b.x - nd.x))
+      .map(n => n.k));
+  }
+  const used = new Set(), faces = [];
+  for (const [uk, list] of around) {
+    for (const vk of list) {
+      if (used.has(uk + '>' + vk)) continue;
+      const ring = [];
+      let a = uk, b = vk, guard = 0;
+      while (!used.has(a + '>' + b) && guard++ < 20000) {
+        used.add(a + '>' + b);
+        const na = nodes.get(a);
+        ring.push([na.x, na.y]);
+        const nb = around.get(b);
+        const idx = nb.indexOf(a);
+        const next = nb[(idx - 1 + nb.length) % nb.length];
+        a = b;
+        b = next;
+      }
+      const area = ring.length >= 3 ? ringSignedArea(ring) : 0;
+      if (area > 0) faces.push({ ring, area });
+    }
+  }
+
+  // 4) conserva las partes de un lote dividido y las franjas pegadas al borde de un lote
+  const maxLot = Math.max(...lots.map(p => p.area));
+  const near = size * 2e-4 + q * 10;
+  const touchesLot = f => {
+    for (let i = 0; i < f.ring.length; i++) {
+      const a = f.ring[i], b = f.ring[(i + 1) % f.ring.length];
+      if (Math.hypot(b[0] - a[0], b[1] - a[1]) <= q * 4) continue;
+      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+      for (const p of lots) {
+        if (mx < p.box[0] - near || mx > p.box[2] + near || my < p.box[1] - near || my > p.box[3] + near) continue;
+        for (let k = 0; k < p.pts.length - 1; k++) if (distToSeg(mx, my, p.pts[k], p.pts[k + 1]) <= near) return true;
+      }
+    }
+    return false;
+  };
+  const free = [], byHost = new Map();
+  for (const f of faces) {
+    if (f.area < maxLot * 0.01 || f.area > maxLot * 1.05) continue;
+    const c = interiorPoint(f.ring, size * 1e-4);
+    const host = lots.filter(p => inPoly(c[0], c[1], p.pts)).sort((a, b) => a.area - b.area)[0];
+    if (host) {
+      if (!byHost.has(host)) byHost.set(host, []);
+      byHost.get(host).push(f);
+    } else if (touchesLot(f)) {
+      free.push(f);
+    }
+  }
+  const out = free.slice(), split = [];
+  for (const [host, list] of byHost) {
+    if (list.length < 2) continue; // el lote no está dividido: se queda como está
+    split.push(polyKey(host.ft));
+    out.push(...list);
+  }
+  return { faces: out, split };
+}
+
+function faceFeatures(feats) {
+  const r = buildFaces(feats);
+  return {
+    split: r.split,
+    feats: r.faces.map(f => ({
+      kind: 'line', layer: FACE_LAYER, color: '#ffffff', pts: f.ring.concat([f.ring[0]]),
+      closed: true, label: 'Figura armada', derived: true,
+    })),
+  };
+}
+
+const FILL_COLORS = ['#ff6b6b', '#4dabf7', '#51cf66', '#fcc419', '#cc5de8', '#ff922b', '#22b8cf', '#94d82d', '#f06595', '#845ef7', '#20c997', '#fd7e14'];
+const LOT_WORDS = /\b(LOTE|SITIO|PARCELA|MANZANA|MZ|UNIDAD|RESTO|ROL|HIJUELA|PREDIO)\b/i;
+
+// Da a cada figura cerrada un color de relleno propio y un nombre tomado del texto que tiene dentro.
+function nameAndColorPolygons(feats) {
+  const polys = [];
+  for (const ft of feats) {
+    if (ft.kind !== 'line' || !ft.closed || ft.noFill || ft.pts.length < 3) continue;
+    const p = ft.pts;
+    let area = 0;
+    for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; area += a[0] * b[1] - b[0] * a[1]; }
+    polys.push({ ft, area: Math.abs(area) / 2, box: featBox(ft), texts: [] });
+  }
+  if (!polys.length) return;
+  // Las figuras muy pequeñas (símbolos de bloques) no reciben color propio.
+  const maxArea = Math.max(...polys.map(pg => pg.area));
+  let k = 0;
+  for (const pg of polys) pg.ft.fill = pg.area >= maxArea * 0.002 ? FILL_COLORS[k++ % FILL_COLORS.length] : null;
+  const texts = feats.filter(f => f.kind === 'text');
+  if (texts.length && polys.length * texts.length <= 4e6) {
+    for (const t of texts) {
+      const x = t.pt[0], y = t.pt[1];
+      let best = null;
+      for (const pg of polys) {
+        const b = pg.box;
+        if (x < b[0] || x > b[2] || y < b[1] || y > b[3]) continue;
+        if ((!best || pg.area < best.area) && inPoly(x, y, pg.ft.pts)) best = pg;
+      }
+      if (best) best.texts.push(t.text.replace(/\s+/g, ' ').trim());
+    }
+  }
+  for (const pg of polys) {
+    const named = pg.texts.find(t => LOT_WORDS.test(t)) ||
+      pg.texts.filter(t => /[A-Za-zÁÉÍÓÚÑáéíóúñ]{3}/.test(t)).sort((a, b) => a.length - b.length)[0];
+    pg.ft.name = named ? (named.length > 60 ? named.slice(0, 58) + '…' : named) : null;
+    pg.ft.inner = pg.texts.slice(0, 6);
+  }
+}
+
+function extract(dxf, opts) {
+  const feats = [];
+  const stats = { xrefs: new Set(), missing: new Set() };
+  const layerColor = name => (dxf.layers.get(name) || { color: '#ffffff' }).color;
+
+  function colorOf(ent, layer, parentColor) {
+    if (ent.tc != null) return tcHex(ent.tc);
+    if (ent.aci === 0) return parentColor || layerColor(layer);
+    if (ent.aci > 0 && ent.aci < 256) return aciHex(ent.aci);
+    return layerColor(layer);
+  }
+
+  function walk(ents, m, parentLayer, parentColor, stack) {
+    for (const ent of ents) {
+      // Dentro de un bloque, lo dibujado en la capa 0 hereda la capa del bloque insertado.
+      const layer = parentLayer != null && ent.layer === '0' ? parentLayer : ent.layer;
+      const color = colorOf(ent, layer, parentColor);
+
+      if (ent.kind === 'insert') {
+        const blk = dxf.blocks.get(ent.block);
+        if (!blk) { stats.missing.add(ent.block); continue; }
+        if (blk.xref) stats.xrefs.add(ent.block);
+        const im = mul(m, insertMatrix(ent, blk.base));
+        if (opts.blockPts) {
+          const name = ent.attribs.length ? ent.attribs[0][1] : ent.block;
+          feats.push({ kind: 'block', layer, color, pt: apply(im, blk.base), name, block: ent.block, attribs: ent.attribs });
+        }
+        if (opts.expand && stack.length < 16 && !stack.includes(ent.block)) {
+          walk(blk.ents, im, layer, color, stack.concat(ent.block));
+        }
+      } else if (ent.kind === 'line') {
+        feats.push({ kind: 'line', layer, color, pts: m === IDENT ? ent.pts : ent.pts.map(p => apply(m, p)), closed: ent.closed, label: ent.label });
+      } else if (ent.kind === 'point') {
+        feats.push({ kind: 'point', layer, color, pt: apply(m, ent.pt), name: 'Punto' });
+      } else if (ent.kind === 'text') {
+        feats.push({ kind: 'text', layer, color, pt: apply(m, ent.pt), text: ent.text });
+      }
+    }
+  }
+
+  walk(dxf.entities, IDENT, null, null, []);
+  nameAndColorPolygons(feats);
+  return { feats, stats };
+}
+
+// ---------------------------------------------------------------------------
+// Detección del sistema de coordenadas
+// ---------------------------------------------------------------------------
+// Contorno simplificado de Chile continental (lon, lat). Su precisión (~0,5°) basta
+// para distinguir zonas UTM, que están separadas por 6°.
+const CHILE = [
+  [-69.5, -17.4], [-69.0, -18.1], [-68.9, -18.9], [-68.4, -19.4], [-68.6, -20.3], [-68.2, -21.3], [-67.9, -22.3], [-67.1, -22.8],
+  [-67.3, -24.0], [-68.3, -24.6], [-68.5, -26.0], [-68.8, -27.2], [-69.4, -28.2], [-69.8, -29.2], [-70.0, -30.4], [-70.4, -31.4],
+  [-70.2, -32.4], [-69.9, -33.4], [-70.0, -34.4], [-70.4, -35.4], [-70.5, -36.4], [-71.1, -37.4], [-71.0, -38.4], [-71.4, -39.4],
+  [-71.7, -40.4], [-71.9, -41.4], [-71.8, -42.4], [-71.7, -43.4], [-71.6, -44.4], [-71.6, -45.4], [-71.7, -46.4], [-71.9, -47.2],
+  [-72.4, -48.0], [-73.2, -49.2], [-73.3, -50.0], [-72.4, -50.8], [-72.3, -51.6], [-71.9, -52.0], [-69.5, -52.1], [-68.4, -52.3],
+  [-68.6, -52.6], [-68.6, -54.85], [-67.2, -54.9], [-66.5, -55.0], [-66.4, -55.6], [-67.3, -56.1], [-68.8, -56.7],
+  [-71.5, -55.7], [-74.0, -53.6], [-75.3, -52.5], [-75.9, -51.0], [-76.0, -49.5], [-75.9, -48.0], [-75.9, -46.5], [-75.3, -45.5],
+  [-75.1, -44.0], [-74.6, -43.0], [-74.3, -42.0], [-74.1, -41.0], [-73.9, -40.0], [-73.8, -39.0], [-73.9, -37.5], [-73.4, -36.5],
+  [-72.8, -35.5], [-72.2, -34.5], [-72.0, -33.5], [-71.9, -32.5], [-71.8, -31.0], [-71.7, -30.0], [-71.6, -29.0], [-71.4, -28.0],
+  [-71.1, -27.0], [-70.9, -26.0], [-70.8, -25.0], [-70.8, -24.0], [-70.6, -23.0], [-70.5, -22.0], [-70.4, -21.0], [-70.4, -20.0],
+  [-70.6, -19.0], [-70.6, -18.2], [-70.4, -17.4],
+];
+
+function inPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function inChile(lon, lat) {
+  if ((lat >= -34.2 && lat <= -33.3 && lon >= -81.2 && lon <= -78.4) ||  // Juan Fernández
+    (lat >= -26.7 && lat <= -25.9 && lon >= -80.5 && lon <= -79.6) ||    // islas Desventuradas
+    (lat >= -27.4 && lat <= -26.8 && lon >= -109.7 && lon <= -109.0)) {  // Isla de Pascua
+    return true;
+  }
+  if (lat > -16.5 || lat < -57.5 || lon < -77 || lon > -65.5) return false;
+  // Margen para planos junto a la costa o la frontera.
+  return inPoly(lon, lat, CHILE) || inPoly(lon - 0.5, lat, CHILE) || inPoly(lon + 0.5, lat, CHILE) ||
+    inPoly(lon, lat - 0.3, CHILE) || inPoly(lon, lat + 0.3, CHILE);
+}
+
+function samplePts(list, getArr, max) {
+  let total = 0;
+  for (const ft of list) total += getArr(ft).length;
+  const step = Math.max(1, Math.floor(total / max));
+  const out = [];
+  let idx = 0;
+  for (const ft of list) for (const p of getArr(ft)) if (idx++ % step === 0) out.push(p);
+  return out;
+}
+const srcArr = ft => (ft.kind === 'line' ? ft.pts : [ft.pt]);
+const llArr = ft => (ft.kind === 'line' ? ft.ll : [ft.p]);
+
+function chileFraction(pts, fwd) {
+  if (!pts.length) return 0;
+  let n = 0;
+  for (const p of pts) {
+    let q = null;
+    try { q = fwd(p); } catch (e) { /* punto fuera del dominio de la proyección */ }
+    if (q && Number.isFinite(q[0]) && Number.isFinite(q[1]) && inChile(q[0], q[1])) n++;
+  }
+  return n / pts.length;
+}
+
+// Prueba las zonas UTM sur usadas en Chile y devuelve aquella en que el dibujo cae en el país.
+function bestUtmZone(pts) {
+  let best = null;
+  for (const zone of [19, 18, 17, 12]) {
+    const conv = proj4(`+proj=utm +zone=${zone} +south +datum=WGS84 +units=m +no_defs`, 'WGS84');
+    const f = chileFraction(pts, p => conv.forward(p));
+    if (!best || f > best.f) best = { zone, f };
+  }
+  return best && best.f >= 0.6 ? best : null;
+}
+
+function detectFromGeoData(g) {
+  if (!g.epsg && !g.name) return null;
+  const csName = g.name || `EPSG:${g.epsg}`;
+  let target = null, custom = null;
+  if (g.epsg && EPSG_IDS[g.epsg]) target = EPSG_IDS[g.epsg];
+  else if (g.epsg && /^32[67]\d\d$/.test(String(g.epsg))) {
+    const s = String(g.epsg);
+    custom = `+proj=utm +zone=${+s.slice(3)}${s[2] === '7' ? ' +south' : ''} +datum=WGS84 +units=m +no_defs`;
+  } else if (g.name) {
+    const m = /UTM(?:84|WGS84)?\D*?(\d{1,2})([NS])\b/i.exec(g.name);
+    if (m && m[2].toUpperCase() === 'S') {
+      const fam = /PSAD/i.test(g.name) ? 'psad56' : /SAD69|SA69/i.test(g.name) ? 'sad69' : /SIRGAS/i.test(g.name) ? 'sirgas' : 'wgs84';
+      target = (UTM_IDS[fam] && UTM_IDS[fam][+m[1]]) || null;
+      if (!target) custom = `+proj=utm +zone=${+m[1]} +south +datum=WGS84 +units=m +no_defs`;
+    }
+  }
+  const reason = `El plano tiene una ubicación geográfica asignada en AutoCAD con el sistema ${csName}.`;
+  if (!target && !custom) {
+    return { kind: 'geodata', warn: true, chip: 'AutoCAD', crsId: null, title: 'Sistema de AutoCAD no reconocido', reason: reason + ' Ese sistema no está en la lista: elígelo manualmente o pega su definición proj4.' };
+  }
+  const label = target ? CRS_LIST.find(c => c.id === target).label : csName;
+  const res = { kind: 'geodata', chip: 'AutoCAD', title: `Georreferenciado en AutoCAD: ${label}`, reason, custom };
+  const rotDeg = 90 - Math.atan2(g.north[1], g.north[0]) / DEG;
+  const moved = g.design && g.ref && (Math.hypot(g.design[0] - g.ref[0], g.design[1] - g.ref[1]) > 1e-6 || Math.abs(g.scale - 1) > 1e-9 || Math.abs(rotDeg) > 1e-9);
+  if (moved && (g.type === 1 || g.type === 2) && target !== 'geo') {
+    res.crsId = 'local';
+    res.local = { targetId: target || 'custom', p1: g.design, t1: g.ref, rot: rotDeg, scale: g.scale };
+    res.reason += ' El dibujo tiene un origen propio y se ubica con el punto de referencia, el giro y la escala guardados en el archivo.';
+  } else {
+    res.crsId = target || 'custom';
+  }
+  return res;
+}
+
+// Clasifica las coordenadas del dibujo: geográficas, UTM, otra proyección o locales.
+function detectCrs(dxf, feats) {
+  if (typeof proj4 === 'undefined') return null;
+  if (dxf.geo) {
+    const g = detectFromGeoData(dxf.geo);
+    if (g) return g;
+  }
+  const pts = samplePts(feats, srcArr, 600).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  if (!pts.length) return null;
+  const fam = storeGet('dxf2kml.datum') || 'wgs84';
+  const xs = pts.map(p => p[0]).sort((a, b) => a - b);
+  const ys = pts.map(p => p[1]).sort((a, b) => a - b);
+  const x1 = quant(xs, 0.02), x2 = quant(xs, 0.98), y1 = quant(ys, 0.02), y2 = quant(ys, 0.98);
+  const mx = quant(xs, 0.5), my = quant(ys, 0.5);
+  const big = Math.max(Math.abs(x1), Math.abs(x2), Math.abs(y1), Math.abs(y2));
+
+  if (big <= 180 && Math.abs(y1) <= 90 && Math.abs(y2) <= 90 && chileFraction(pts, p => p) >= 0.6) {
+    return { kind: 'geo', chip: 'Geográficas', crsId: 'geo', title: 'Coordenadas geográficas (grados)', reason: `Longitud ≈ ${fmt(mx, 5)}°, latitud ≈ ${fmt(my, 5)}°: el dibujo ya está en grados y cae en Chile.` };
+  }
+
+  // UTM del hemisferio sur, en metros o escalado a milímetros / centímetros.
+  for (const [factor, unit] of [[1, ''], [0.001, 'milímetros'], [0.01, 'centímetros']]) {
+    if (!(x1 * factor > 100000 && x2 * factor < 900000 && y1 * factor > 1000000 && y2 * factor < 10000000)) continue;
+    const best = bestUtmZone(factor === 1 ? pts : pts.map(p => [p[0] * factor, p[1] * factor]));
+    if (!best) {
+      if (factor !== 1) continue;
+      return { kind: 'projected', warn: true, soft: true, chip: 'Proyectada', crsId: utmId(fam, 19), title: 'Formato UTM, zona no identificada', reason: `Este ≈ ${fmt(mx, 0)}, Norte ≈ ${fmt(my, 0)}: los valores tienen formato UTM del hemisferio sur, pero en ninguna de las zonas usadas en Chile (19S, 18S, 17S o 12S) el dibujo cae en territorio chileno. Elige el sistema manualmente.` };
+    }
+    const id = utmId(fam, best.zone);
+    const res = { kind: 'utm', chip: 'UTM', crsId: id, title: `Proyección UTM, zona ${best.zone}S${unit ? ` (dibujo en ${unit})` : ''}`, reason: `Este ≈ ${fmt(mx * factor, 0)} m, Norte ≈ ${fmt(my * factor, 0)} m: formato UTM del hemisferio sur. Con la zona ${best.zone}S el dibujo cae en Chile; con las otras zonas quedaría fuera del país.` };
+    if (factor !== 1) {
+      res.crsId = 'local';
+      res.local = { targetId: id, p1: [0, 0], t1: [0, 0], rot: 0, scale: factor };
+      res.reason += ` Como el dibujo está en ${unit}, se multiplica por ${fmtIn(factor, 3)} para pasarlo a metros.`;
+    }
+    return res;
+  }
+
+  if (big > 180 && big <= 20037509) {
+    const conv = proj4('EPSG:3857', 'WGS84');
+    if (chileFraction(pts, p => conv.forward(p)) >= 0.6) {
+      return { kind: 'projected', chip: 'Proyectada', crsId: 'webmerc', title: 'Web Mercator (EPSG:3857)', reason: `X ≈ ${fmt(mx, 0)}, Y ≈ ${fmt(my, 0)}: valores negativos del orden de millones, propios de la proyección de mapas web; con ella el dibujo cae en Chile.` };
+    }
+  }
+
+  if (Math.max(Math.abs(mx), Math.abs(my)) >= 100000) {
+    return { kind: 'projected', warn: true, soft: true, chip: 'Proyectada', crsId: 'local', local: null, title: 'Proyectada, sistema no identificado', reason: `X ≈ ${fmt(mx, 0)}, Y ≈ ${fmt(my, 0)}: coordenadas planas grandes que no corresponden a UTM en Chile. Puede ser otra proyección o un sistema de obra con origen desplazado. Si conoces su definición proj4, elige "Otro sistema"; si no, usa "Coordenadas locales" con puntos de control.` };
+  }
+
+  // Muchas plantillas traen $INSUNITS en milímetros aunque se dibuje en metros: los textos del plano mandan.
+  const saysMeters = feats.some(ft => ft.kind === 'text' && /\d\s*(m2|m²|mts?\b|metros)/i.test(ft.text));
+  const units = { 1: 'pulgadas', 2: 'pies', 4: 'milímetros', 5: 'centímetros' }[dxf.insunits];
+  let unitNote = '';
+  if (saysMeters) unitNote = ' Los textos del plano indican medidas en metros, así que la escala 1 es correcta.';
+  else if (units) unitNote = ` El archivo tiene configuradas unidades en ${units}, pero muchas plantillas vienen así aunque se dibuje en metros: si las medidas del plano están en metros, deja la escala en 1.`;
+  return { kind: 'local', chip: 'Local', crsId: 'local', local: null, title: 'Coordenadas locales', reason: `X ≈ ${fmt(mx, 2)}, Y ≈ ${fmt(my, 2)}: valores pequeños, sin formato geográfico ni UTM. El plano usa un origen propio; para ubicarlo, indica al menos un punto de control (puedes elegirlo en el dibujo).${unitNote}` };
+}
+
+// ---------------------------------------------------------------------------
+// Proyección a WGS84
+// ---------------------------------------------------------------------------
+function currentCrs() { return CRS_LIST.find(c => c.id === $('crs').value) || CRS_LIST[0]; }
+
+function getProjector(crs) {
+  if (crs.id === 'geo') return p => p;
+  if (typeof proj4 === 'undefined') throw new UserError('No se pudo cargar la librería de coordenadas (proj4). Revisa tu conexión a internet y recarga la página.');
+  const def = crs.id === 'custom' ? $('customDef').value.trim() : crs.def;
+  if (!def) throw new UserError('Escribe la definición proj4 del sistema de coordenadas.');
+  try {
+    const conv = proj4(def, 'WGS84');
+    const test = conv.forward([500000, 6000000]);
+    if (!test || !Number.isFinite(test[0])) throw new Error('inválida');
+    return p => conv.forward(p);
+  } catch (e) {
+    throw new UserError('La definición proj4 no es válida.');
+  }
+}
+
+// Convierte textos como "346485,12", "6.297.900" o "346485.12" en número.
+function parseNum(s) {
+  s = String(s == null ? '' : s).replace(/\s/g, '');
+  if (!s) return NaN;
+  const comma = s.lastIndexOf(','), dot = s.lastIndexOf('.');
+  if (comma > -1 && dot > -1) s = comma > dot ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  else if (comma > -1) s = s.split(',').length > 2 ? s.replace(/,/g, '') : s.replace(',', '.');
+  else if (s.split('.').length > 2) s = s.replace(/\./g, '');
+  return /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(s) ? parseFloat(s) : NaN;
+}
+
+// Coordenadas locales → sistema real, con uno o dos puntos de control (traslación, giro y escala).
+function readLocal() {
+  const val = id => parseNum($(id).value);
+  const s1 = [val('p1x'), val('p1y')], t1 = [val('p1e'), val('p1n')];
+  const s2 = [val('p2x'), val('p2y')], t2 = [val('p2e'), val('p2n')];
+  const full = a => a.every(Number.isFinite);
+  const res = { targetId: $('localTarget').value, twoPts: false, p2Partial: false };
+  if (!full(s1) || !full(t1)) {
+    res.error = 'El plano está en coordenadas locales: para ubicarlo, completa el punto de control 1 en el paso 3 (coordenadas en el dibujo y coordenadas reales).';
+    return res;
+  }
+  let rot, scale;
+  if (full(s2) && full(t2)) {
+    const sx = s2[0] - s1[0], sy = s2[1] - s1[1], tx = t2[0] - t1[0], ty = t2[1] - t1[1];
+    if (Math.hypot(sx, sy) < 1e-9 || Math.hypot(tx, ty) < 1e-9) {
+      res.error = 'Los puntos de control 1 y 2 no pueden coincidir.';
+      return res;
+    }
+    scale = Math.hypot(tx, ty) / Math.hypot(sx, sy);
+    rot = Math.atan2(ty, tx) - Math.atan2(sy, sx);
+    res.twoPts = true;
+  } else {
+    res.p2Partial = [...s2, ...t2].some(Number.isFinite);
+    rot = (Number.isFinite(val('lRot')) ? val('lRot') : 0) * DEG;
+    scale = val('lScale');
+    if (!(scale > 0)) {
+      res.error = 'La escala de las coordenadas locales debe ser un número mayor que 0.';
+      return res;
+    }
+  }
+  const c = Math.cos(rot) * scale, s = Math.sin(rot) * scale;
+  res.plane = p => {
+    const dx = p[0] - s1[0], dy = p[1] - s1[1];
+    return [t1[0] + c * dx - s * dy, t1[1] + s * dx + c * dy];
+  };
+  res.rot = rot;
+  res.scale = scale;
+  return res;
+}
+
+const isLongLat = crs => crs.id === 'geo' || (crs.id === 'custom' && /\+proj=(longlat|latlong)/.test($('customDef').value));
+
+// Cadena de conversión: coordenadas del dibujo → plano real (solo en modo local) → WGS84.
+// Ajuste fino de posición: desplaza todo el dibujo ya convertido, en metros hacia el este y el norte.
+function shiftLL(p) {
+  const phi = p[1] * DEG;
+  const mLat = 111132.92 - 559.82 * Math.cos(2 * phi) + 1.175 * Math.cos(4 * phi);
+  const mLon = 111412.84 * Math.cos(phi) - 93.5 * Math.cos(3 * phi);
+  return [p[0] + state.shift.e / mLon, p[1] + state.shift.n / mLat];
+}
+const withShift = f => (state.shift.e || state.shift.n ? p => shiftLL(f(p)) : f);
+
+function renderShift() {
+  const s = state.shift;
+  const part = (v, pos, neg) => (Math.abs(v) < 1e-9 ? '' : `${fmt(Math.abs(v), 1)} m al ${v > 0 ? pos : neg}`);
+  const txt = [part(s.n, 'norte', 'sur'), part(s.e, 'este', 'oeste')].filter(Boolean).join(' y ');
+  $('shiftText').textContent = txt ? 'Desplazado ' + txt : 'Sin desplazamiento';
+  $('shiftReset').classList.toggle('hidden', !txt);
+}
+
+function getPipeline(crs) {
+  if (crs.id === 'local') {
+    const lp = readLocal();
+    if (lp.error) throw new UserError(lp.error);
+    const target = CRS_LIST.find(c => c.id === lp.targetId) || CRS_LIST[0];
+    const fwd = getProjector(target);
+    return { plane: lp.plane, fwd: withShift(p => fwd(lp.plane(p))), measure: !target.noMeasure && !isLongLat(target), local: lp };
+  }
+  return { plane: null, fwd: withShift(getProjector(crs)), measure: !crs.noMeasure && !isLongLat(crs), local: null };
+}
+
+function projectAll(feats, pipe) {
+  const { fwd, plane } = pipe;
+  const ok = p => Number.isFinite(p[0]) && Number.isFinite(p[1]) && Math.abs(p[1]) <= 90 && Math.abs(p[0]) <= 360;
+  const out = [];
+  let bad = 0;
+  for (const ft of feats) {
+    if (ft.kind === 'line') {
+      const ll = ft.pts.map(fwd);
+      if (!ll.every(ok)) { bad++; continue; }
+      let len = 0, area = 0;
+      const pts = plane ? ft.pts.map(plane) : ft.pts;
+      for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      if (ft.closed) {
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i], b = pts[(i + 1) % pts.length];
+          area += a[0] * b[1] - b[0] * a[1];
+        }
+        area = Math.abs(area) / 2;
+        const first = pts[0], last = pts[pts.length - 1];
+        if (first[0] !== last[0] || first[1] !== last[1]) len += Math.hypot(first[0] - last[0], first[1] - last[1]);
+      }
+      out.push(Object.assign({}, ft, { ll, len, area }));
+    } else {
+      const p = fwd(ft.pt);
+      if (!ok(p)) { bad++; continue; }
+      out.push(Object.assign({}, ft, { p }));
+    }
+  }
+  return { feats: out, bad };
+}
+
+// Muestra de vértices separada en X e Y
+function sampleMedian(list, getArr) {
+  const pts = samplePts(list, getArr, 20000);
+  return { xs: pts.map(p => p[0]), ys: pts.map(p => p[1]) };
+}
+const quant = (a, q) => a[Math.min(a.length - 1, Math.max(0, Math.round((a.length - 1) * q)))];
+
+// ---------------------------------------------------------------------------
+// Zonas: dibujos separados dentro del mismo espacio modelo
+// ---------------------------------------------------------------------------
+function featBox(ft) {
+  if (ft.kind !== 'line') return [ft.pt[0], ft.pt[1], ft.pt[0], ft.pt[1]];
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  for (const p of ft.pts) {
+    if (p[0] < x1) x1 = p[0];
+    if (p[0] > x2) x2 = p[0];
+    if (p[1] < y1) y1 = p[1];
+    if (p[1] > y2) y2 = p[1];
+  }
+  return [x1, y1, x2, y2];
+}
+
+// Agrupa los elementos cercanos entre sí marcando en una grilla fina las celdas que tocan sus trazos.
+function findZones(feats) {
+  const pts = samplePts(feats, srcArr, 20000).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  if (feats.length < 20 || pts.length < 10) return [];
+  const xs = pts.map(p => p[0]).sort((a, b) => a - b), ys = pts.map(p => p[1]).sort((a, b) => a - b);
+  const size = Math.max(quant(xs, 0.98) - quant(xs, 0.02), quant(ys, 0.98) - quant(ys, 0.02));
+  if (!(size > 0)) return [];
+  const cell = size / 150;
+  const key = (i, j) => i + ',' + j;
+  const cells = new Map(); // celda -> componente (-1 = sin asignar)
+  const firstCell = [];
+  for (const ft of feats) {
+    const arr = srcArr(ft);
+    if (!Number.isFinite(arr[0][0]) || !Number.isFinite(arr[0][1])) { firstCell.push(null); continue; }
+    const k0 = key(Math.floor(arr[0][0] / cell), Math.floor(arr[0][1] / cell));
+    firstCell.push(k0);
+    cells.set(k0, -1);
+    for (let k = 1; k < arr.length; k++) {
+      const a = arr[k - 1], b = arr[k];
+      const steps = Math.min(5000, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / (cell / 2)));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        const k1 = key(Math.floor((a[0] + (b[0] - a[0]) * t) / cell), Math.floor((a[1] + (b[1] - a[1]) * t) / cell));
+        if (!cells.has(k1)) cells.set(k1, -1);
+      }
+    }
+  }
+  // Componentes conectados, tolerando huecos de hasta dos celdas.
+  const comps = [];
+  for (const [k, v] of cells) {
+    if (v !== -1) continue;
+    const id = comps.length;
+    const comp = { i1: Infinity, j1: Infinity, i2: -Infinity, j2: -Infinity, count: 0, texts: [] };
+    comps.push(comp);
+    cells.set(k, id);
+    const stack = [k];
+    while (stack.length) {
+      const [i, j] = stack.pop().split(',').map(Number);
+      if (i < comp.i1) comp.i1 = i;
+      if (i > comp.i2) comp.i2 = i;
+      if (j < comp.j1) comp.j1 = j;
+      if (j > comp.j2) comp.j2 = j;
+      for (let di = -2; di <= 2; di++) {
+        for (let dj = -2; dj <= 2; dj++) {
+          const nk = key(i + di, j + dj);
+          if (cells.get(nk) === -1) { cells.set(nk, id); stack.push(nk); }
+        }
+      }
+    }
+  }
+  feats.forEach((ft, n) => {
+    if (firstCell[n] == null) return;
+    const comp = comps[cells.get(firstCell[n])];
+    comp.count++;
+    if (ft.kind === 'text') comp.texts.push(ft.text);
+  });
+  // Une grupos separados por menos de un 3% del tamaño del dibujo (un plano con sus rótulos y cotas).
+  const groups = comps
+    .map(c => ({ x1: c.i1 * cell, y1: c.j1 * cell, x2: (c.i2 + 1) * cell, y2: (c.j2 + 1) * cell, count: c.count, texts: c.texts }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 300);
+  const gap = size * 0.03;
+  for (let merged = true; merged;) {
+    merged = false;
+    for (let a = 0; a < groups.length && !merged; a++) {
+      for (let b = a + 1; b < groups.length; b++) {
+        const A = groups[a], B = groups[b];
+        if (A.x1 - gap <= B.x2 && B.x1 - gap <= A.x2 && A.y1 - gap <= B.y2 && B.y1 - gap <= A.y2) {
+          groups[a] = { x1: Math.min(A.x1, B.x1), y1: Math.min(A.y1, B.y1), x2: Math.max(A.x2, B.x2), y2: Math.max(A.y2, B.y2), count: A.count + B.count, texts: A.texts.concat(B.texts) };
+          groups.splice(b, 1);
+          merged = true;
+          break;
+        }
+      }
+    }
+  }
+  const min = Math.max(10, feats.length * 0.03);
+  const zones = groups.filter(g => g.count >= min).map(g => ({
+    x1: g.x1 - cell, y1: g.y1 - cell, x2: g.x2 + cell, y2: g.y2 + cell,
+    count: g.count, label: zoneLabel(g.texts),
+  }));
+  if (zones.length < 2) return [];
+  zones.sort((a, b) => a.x1 - b.x1 || b.y2 - a.y2);
+  return zones;
+}
+
+// Textos que mejor identifican un dibujo, de más a menos distintivos.
+const ZONE_TIERS = [/SITUACI|CROQUIS|UBICACI|PLANTA|PERFIL|TOPOGR/i, /SUP(ERFICIE|\.)?\s*TOTAL|\bLOTE\b/i, /PROPUEST|ACTUAL|SUPERFICIE|DESLINDE/i];
+const zoneTier = t => { const i = ZONE_TIERS.findIndex(re => re.test(t)); return i < 0 ? ZONE_TIERS.length : i; };
+function zoneLabel(texts) {
+  const clean = [...new Set(texts.map(t => t.replace(/\s+/g, ' ').trim()).filter(t => t.length >= 4 && /[A-Za-zÁÉÍÓÚÑáéíóúñ]{3}/.test(t)))];
+  clean.sort((a, b) => zoneTier(a) - zoneTier(b) || a.length - b.length);
+  return clean.slice(0, 2).map(t => (t.length > 60 ? t.slice(0, 58) + '…' : t));
+}
+
+function zoneRect() {
+  if (state.zoneRect) return state.zoneRect;
+  return state.zoneIdx >= 0 ? state.zones[state.zoneIdx] || null : null;
+}
+
+function inZone(ft, r) {
+  const p = srcArr(ft)[0];
+  if (p[0] >= r.x1 && p[0] <= r.x2 && p[1] >= r.y1 && p[1] <= r.y2) return true;
+  const b = featBox(ft), cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+  return cx >= r.x1 && cx <= r.x2 && cy >= r.y1 && cy <= r.y2;
+}
+
+function renderZones() {
+  const box = $('zonesBox'), list = $('zoneList');
+  const show = !!state.dxf && (state.zones.length >= 2 || !!state.zoneRect);
+  box.classList.toggle('hidden', !show);
+  list.innerHTML = '';
+  if (!show) return;
+  $('zonesTitle').textContent = state.zones.length >= 2 ? `Este archivo tiene ${state.zones.length} dibujos separados` : 'Parte del dibujo a convertir';
+  const current = state.zoneRect ? 'custom' : state.zoneIdx >= 0 ? String(state.zoneIdx) : 'all';
+  const add = (value, title, sub) => {
+    const row = document.createElement('label');
+    row.className = 'zone-opt';
+    row.innerHTML = `<input type="radio" name="zone" value="${value}"${value === current ? ' checked' : ''}><span>${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>`;
+    row.querySelector('input').addEventListener('change', () => selectZone(value));
+    list.appendChild(row);
+  };
+  add('all', `Todo el archivo (${state.allFeats.length.toLocaleString('es-CL')} elementos)`);
+  state.zones.forEach((z, i) => add(String(i), `Zona ${i + 1} · ${z.count.toLocaleString('es-CL')} elementos · ${fmt(z.x2 - z.x1, 0)} × ${fmt(z.y2 - z.y1, 0)}`, z.label.length ? '«' + z.label.join('» «') + '»' : ''));
+  if (state.zoneRect) add('custom', 'Zona marcada a mano', `${fmt(state.zoneRect.x2 - state.zoneRect.x1, 0)} × ${fmt(state.zoneRect.y2 - state.zoneRect.y1, 0)}`);
+}
+
+function selectZone(value) {
+  if (value === 'all') { state.zoneRect = null; state.zoneIdx = -1; }
+  else if (value !== 'custom') { state.zoneRect = null; state.zoneIdx = +value; }
+  if (!state.manualCrs) state.needsDetect = true;
+  rebuild(true);
+  renderZones();
+  setView('draw');
+  fitDraw();
+}
+
+// ---------------------------------------------------------------------------
+// KML
+// ---------------------------------------------------------------------------
+function buildKml() {
+  const opts = readOpts();
+  const measure = opts.measure && state.measure;
+  const styles = new Map();
+  const bgr = c => c.slice(5, 7) + c.slice(3, 5) + c.slice(1, 3);
+
+  const style = (kind, color, fill) => {
+    const id = kind + color.slice(1) + (fill ? fill.slice(1) : '');
+    if (!styles.has(id)) {
+      const k = bgr(color);
+      let xml;
+      if (kind === 'g') xml = `<LineStyle><color>ff${k}</color><width>${opts.width}</width></LineStyle><PolyStyle><color>73${bgr(fill)}</color><outline>1</outline></PolyStyle>`;
+      else if (kind === 'l') xml = `<LineStyle><color>ff${k}</color><width>${opts.width}</width></LineStyle><PolyStyle><color>00${k}</color></PolyStyle>`;
+      else if (kind === 't') xml = `<IconStyle><scale>0</scale></IconStyle><LabelStyle><color>ff${k}</color><scale>0.9</scale></LabelStyle>`;
+      else xml = `<IconStyle><color>ff${k}</color><scale>0.7</scale><Icon><href>https://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle><LabelStyle><scale>0.7</scale></LabelStyle>`;
+      styles.set(id, `<Style id="${id}">${xml}</Style>`);
+    }
+    return id;
+  };
+
+  const desc = lines => `<description><![CDATA[${lines.map(esc).join('<br>')}]]></description>`;
+  const coord = p => p[0].toFixed(7) + ',' + p[1].toFixed(7);
+
+  const byLayer = new Map();
+  for (const ft of visibleFeatures(opts)) {
+    if (!byLayer.has(ft.layer)) byLayer.set(ft.layer, []);
+    byLayer.get(ft.layer).push(ft);
+  }
+
+  const folders = [];
+  for (const layer of [...byLayer.keys()].sort(byName)) {
+    const pm = [];
+    for (const ft of byLayer.get(layer)) {
+      const lines = ['Capa: ' + layer];
+      if (ft.kind === 'line') {
+        if (measure) {
+          lines.push(`Longitud: ${fmt(ft.len)} m`);
+          if (ft.closed) lines.push(`Superficie: ${fmt(ft.area)} m² (${fmt(ft.area / 10000, 4)} ha)`);
+        }
+        let geom;
+        if (ft.closed && opts.polys && !ft.noFill && ft.ll.length >= 3) {
+          const ring = ft.ll.slice();
+          const a = ring[0], b = ring[ring.length - 1];
+          if (a[0] !== b[0] || a[1] !== b[1]) ring.push(a);
+          geom = `<Polygon><tessellate>1</tessellate><outerBoundaryIs><LinearRing><coordinates>${ring.map(coord).join(' ')}</coordinates></LinearRing></outerBoundaryIs></Polygon>`;
+        } else {
+          const path = ft.ll.slice();
+          if (ft.closed) {
+            const a = path[0], b = path[path.length - 1];
+            if (a[0] !== b[0] || a[1] !== b[1]) path.push(a);
+          }
+          geom = `<LineString><tessellate>1</tessellate><coordinates>${path.map(coord).join(' ')}</coordinates></LineString>`;
+        }
+        const isPoly = ft.closed && opts.polys && !ft.noFill && ft.ll.length >= 3;
+        if (isPoly && ft.inner && ft.inner.length) lines.push('Textos: ' + ft.inner.join(' · '));
+        const sid = isPoly ? style('g', ft.color, opts.fill === 'auto' && ft.fill ? ft.fill : ft.color) : style('l', ft.color);
+        pm.push(`<Placemark><name>${esc(isPoly ? ft.name || 'Figura cerrada' : ft.label)}</name>${desc(lines)}<styleUrl>#${sid}</styleUrl>${geom}</Placemark>`);
+      } else if (ft.kind === 'text') {
+        pm.push(`<Placemark><name>${esc(ft.text.replace(/\s*\n\s*/g, ' '))}</name>${desc(lines.concat(ft.text.split('\n')))}<styleUrl>#${style('t', ft.color)}</styleUrl><Point><coordinates>${coord(ft.p)}</coordinates></Point></Placemark>`);
+      } else {
+        if (ft.kind === 'block') {
+          lines.push('Bloque: ' + ft.block);
+          for (const [tag, val] of ft.attribs) lines.push(`${tag}: ${val}`);
+        }
+        pm.push(`<Placemark><name>${esc(ft.name)}</name>${desc(lines)}<styleUrl>#${style('p', ft.color)}</styleUrl><Point><coordinates>${coord(ft.p)}</coordinates></Point></Placemark>`);
+      }
+    }
+    folders.push(`<Folder><name>${esc(layer)}</name>\n${pm.join('\n')}\n</Folder>`);
+  }
+
+  const docName = state.name.replace(/\.dxf$/i, '');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n<name>${esc(docName)}</name>\n${[...styles.values()].join('\n')}\n${folders.join('\n')}\n</Document>\n</kml>\n`;
+}
+
+// ---------------------------------------------------------------------------
+// Vista del dibujo (coordenadas originales) y selección de puntos con clics
+// ---------------------------------------------------------------------------
+let dmap = null, dLines = null, dZones = null, dMarks = null, dRenderer = null, rectStart = null, rectShape = null;
+const mapMarks = typeof L !== 'undefined' ? L.layerGroup() : null;
+const planMark = typeof L !== 'undefined' ? L.layerGroup() : null;
+
+function initDrawMap() {
+  if (typeof L === 'undefined') return;
+  dmap = L.map('drawmap', { crs: L.CRS.Simple, preferCanvas: true, minZoom: -24, maxZoom: 14, zoomSnap: 0, attributionControl: false }).setView([0, 0], 0);
+  dRenderer = L.canvas({ padding: 0.5 });
+  dLines = L.layerGroup().addTo(dmap);
+  dZones = L.layerGroup().addTo(dmap);
+  dMarks = L.layerGroup().addTo(dmap);
+  dmap.on('click', e => onPick('draw', e));
+  dmap.on('mousedown', onRectStart);
+  dmap.on('mousemove', onRectMove);
+  dmap.on('mouseup', onRectEnd);
+}
+
+function renderDraw() {
+  if (!dmap) return;
+  dLines.clearLayers();
+  dZones.clearLayers();
+  if (state.dxf) {
+    const r = zoneRect();
+    const texts = readOpts().texts;
+    for (const ft of state.allFeats) {
+      if (!layerIsOn(ft.layer) || (ft.kind === 'text' && !texts)) continue;
+      const dim = r && !inZone(ft, r);
+      const style = { renderer: dRenderer, color: ft.color, weight: 1.2, opacity: dim ? 0.2 : 0.95, interactive: false };
+      if (ft.kind === 'line') L.polyline(ft.pts.map(p => [p[1], p[0]]), style).addTo(dLines);
+      else L.circleMarker([ft.pt[1], ft.pt[0]], Object.assign(style, { radius: ft.kind === 'text' ? 1.5 : 3, fillColor: ft.color, fillOpacity: dim ? 0.2 : 0.9 })).addTo(dLines);
+    }
+    state.zones.forEach((z, i) => {
+      const sel = !state.zoneRect && state.zoneIdx === i;
+      L.rectangle([[z.y1, z.x1], [z.y2, z.x2]], { renderer: dRenderer, color: sel ? '#2dd4bf' : '#f5c542', weight: sel ? 2.5 : 1.5, dashArray: sel ? null : '6 5', fillOpacity: 0.03 })
+        .bindTooltip(`Zona ${i + 1}`, { permanent: true, direction: 'center', className: 'zone-label' })
+        .on('click', ev => { if (state.picking) return; L.DomEvent.stop(ev); selectZone(String(i)); })
+        .addTo(dZones);
+    });
+    if (state.zoneRect) {
+      const z = state.zoneRect;
+      L.rectangle([[z.y1, z.x1], [z.y2, z.x2]], { renderer: dRenderer, color: '#2dd4bf', weight: 2.5, fillOpacity: 0.03, interactive: false }).addTo(dZones);
+    }
+  }
+  renderMarks();
+}
+
+function fitDraw() {
+  if (!dmap || !state.allFeats.length) return;
+  let bounds;
+  const r = zoneRect();
+  if (r) bounds = [[r.y1, r.x1], [r.y2, r.x2]];
+  else {
+    const pts = samplePts(state.allFeats, srcArr, 20000);
+    const xs = pts.map(p => p[0]).sort((a, b) => a - b), ys = pts.map(p => p[1]).sort((a, b) => a - b);
+    bounds = [[quant(ys, 0.01), quant(xs, 0.01)], [quant(ys, 0.99), quant(xs, 0.99)]];
+  }
+  dmap.invalidateSize(false);
+  const size = dmap.getSize();
+  if (!size.x || !size.y) { state.pendingDrawFit = true; return; }
+  state.pendingDrawFit = false;
+  dmap.fitBounds(L.latLngBounds(bounds).pad(0.08));
+}
+
+function setView(v) {
+  state.view = v;
+  $('map').classList.toggle('hidden', v !== 'map');
+  $('drawmap').classList.toggle('hidden', v !== 'draw');
+  for (const b of $('viewTabs').querySelectorAll('button')) b.classList.toggle('on', b.dataset.view === v);
+  updateMapEmpty();
+  if (v === 'map' && map) map.invalidateSize(false);
+  if (v === 'draw' && dmap) {
+    dmap.invalidateSize(false);
+    if (state.pendingDrawFit) fitDraw();
+  }
+}
+
+function localTargetDef() {
+  const t = CRS_LIST.find(c => c.id === $('localTarget').value);
+  if (!t || t.id === 'geo' || t.id === 'local') return null;
+  return t.id === 'custom' ? $('customDef').value.trim() : t.def;
+}
+function realToLonLat(p) {
+  try { const d = localTargetDef(); return d ? proj4(d, 'WGS84').forward(p) : null; } catch (e) { return null; }
+}
+function lonLatToReal(lon, lat) {
+  try { const d = localTargetDef(); return d ? proj4('WGS84', d).forward([lon, lat]) : null; } catch (e) { return null; }
+}
+
+const cpMarker = (latlng, n) => L.circleMarker(latlng, { radius: 6, color: '#fff', weight: 2, fillColor: '#0f766e', fillOpacity: 1, interactive: false })
+  .bindTooltip('P' + n, { permanent: true, direction: 'right', offset: [8, 0], className: 'cp-label' });
+
+// Marca los puntos de control en el dibujo (X,Y) y en el mapa (Este/Norte).
+function renderMarks() {
+  if (dMarks) dMarks.clearLayers();
+  if (mapMarks) mapMarks.clearLayers();
+  if (!state.dxf || currentCrs().id !== 'local' || typeof L === 'undefined') return;
+  for (const n of [1, 2]) {
+    const x = parseNum($(`p${n}x`).value), y = parseNum($(`p${n}y`).value);
+    const e = parseNum($(`p${n}e`).value), no = parseNum($(`p${n}n`).value);
+    if (dMarks && Number.isFinite(x) && Number.isFinite(y)) cpMarker([y, x], n).addTo(dMarks);
+    if (mapMarks && Number.isFinite(e) && Number.isFinite(no)) {
+      const ll = realToLonLat([e, no]);
+      if (ll && Number.isFinite(ll[1])) cpMarker([ll[1], ll[0]], n).addTo(mapMarks);
+    }
+  }
+}
+
+// Coordenadas UTM escritas en los textos del plano, p. ej. "19 H 235332.80 E 6202103.54" o "E: 346.485,12 N: 6.297.900".
+function findPlanCoords(feats) {
+  const found = [], seen = new Set();
+  for (const ft of feats) {
+    if (ft.kind !== 'text') continue;
+    const t = ft.text.replace(/\s+/g, ' ').trim();
+    const nums = (t.match(/\d[\d.,]*\d/g) || []).map(parseNum).filter(Number.isFinite);
+    const e = nums.find(v => v >= 100000 && v < 1000000);
+    const n = nums.find(v => v >= 1000000 && v < 10000000);
+    if (e == null || n == null) continue;
+    const k = Math.round(e) + ',' + Math.round(n);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const z = /(?:HUSO|ZONA|ZONE|UTM)\s*(\d{1,2})\b|\b(\d{1,2})\s?([C-HJ-NP-X])\b/.exec(t.toUpperCase());
+    let zone = z ? +(z[1] || z[2]) : null;
+    if (!(zone >= 1 && zone <= 60)) zone = null;
+    found.push({ e, n, zone, south: zone && z[3] ? z[3] < 'N' : true, text: t });
+  }
+  return found;
+}
+
+function planCoordLonLat(c) {
+  const def = c.zone ? `+proj=utm +zone=${c.zone}${c.south ? ' +south' : ''} +datum=WGS84 +units=m +no_defs` : localTargetDef();
+  try {
+    const ll = def && proj4(def, 'WGS84').forward([c.e, c.n]);
+    return ll && Number.isFinite(ll[1]) ? ll : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function renderCoordHint() {
+  const c = state.dxf && currentCrs().id === 'local' ? state.planCoords[0] : null;
+  $('coordHint').classList.toggle('hidden', !c);
+  if (!c) return;
+  const zone = c.zone ? `huso ${c.zone}${c.south ? 'S' : 'N'} · ` : '';
+  const txt = c.text.length > 70 ? c.text.slice(0, 68) + '…' : c.text;
+  $('coordHintText').textContent = `${zone}Este ${fmt(c.e, 2)} · Norte ${fmt(c.n, 2)} (texto «${txt}»). Marca en el dibujo el punto al que corresponde.`;
+}
+
+// Acerca el mapa al lugar donde probablemente está el punto que se va a elegir.
+function centerForPick(n) {
+  if (!map) return;
+  const val = (k, c) => parseNum($(`p${k}${c}`).value);
+  const own = [val(n, 'e'), val(n, 'n')], other = [val(3 - n, 'e'), val(3 - n, 'n')];
+  let ll = own.every(Number.isFinite) ? realToLonLat(own) : null;
+  if (ll && Number.isFinite(ll[1])) { map.setView([ll[1], ll[0]], 18); return; }
+  if (state.proj.length) { fitMap(); return; }
+  ll = other.every(Number.isFinite) ? realToLonLat(other) : null;
+  if (!(ll && Number.isFinite(ll[1])) && state.planCoords[0]) ll = planCoordLonLat(state.planCoords[0]);
+  if (ll && Number.isFinite(ll[1])) map.setView([ll[1], ll[0]], 17);
+}
+
+// ---------------------------------------------------------------------------
+// Norte del plano (flechas de norte insertadas como bloque)
+// ---------------------------------------------------------------------------
+const NORTH_RE = /norte|north|rosa.?(de.?)?viento|compas|brujula|brújula/i;
+
+function collectInserts(P, recs) {
+  const out = [];
+  for (const r of recs) {
+    if (r.type !== 'INSERT') continue;
+    const f = fields(P, r);
+    out.push({ block: f.get(2) || '', x: num(f.get(10)), y: num(f.get(20)), rot: num(f.get(50)), paper: f.get(67) === '1' });
+  }
+  return out;
+}
+
+// Un bloque es flecha de norte si su nombre lo dice o si contiene el texto "N".
+function isNorthBlock(dxf, name) {
+  if (NORTH_RE.test(name)) return true;
+  const blk = dxf.blocks.get(name);
+  return !!blk && blk.ents.some(e => e.kind === 'text' && /^(N|NORTE|NORTH)\.?$/i.test(e.text.trim()));
+}
+
+function findNorthInserts(dxf) {
+  const known = new Map();
+  return (dxf.inserts || []).filter(i => {
+    if (!known.has(i.block)) known.set(i.block, isNorthBlock(dxf, i.block));
+    return known.get(i.block);
+  });
+}
+
+const norm180 = a => { const x = ((a % 360) + 360) % 360; return x > 180 ? x - 360 : x; };
+
+// Agrupa los giros parecidos. Se asume que la flecha del bloque apunta hacia arriba,
+// así que el dibujo está girado -giro respecto del norte.
+function northOptions(list, zone) {
+  const inRect = i => zone && i.x >= zone.x1 && i.x <= zone.x2 && i.y >= zone.y1 && i.y <= zone.y2;
+  let use = zone ? list.filter(i => !i.paper && inRect(i)) : [];
+  let scope = 'junto al dibujo elegido';
+  if (!use.length) { use = list.filter(i => !i.paper); scope = 'del espacio modelo'; }
+  if (!use.length) { use = list; scope = 'de las láminas'; }
+  if (!use.length) return null;
+  const groups = [];
+  for (const i of use) {
+    const a = ((i.rot % 360) + 360) % 360;
+    let g = groups.find(x => Math.abs(norm180(x.angle - a)) <= 5);
+    if (!g) { g = { angle: a, items: [] }; groups.push(g); }
+    g.items.push(i);
+  }
+  groups.sort((a, b) => b.items.length - a.items.length);
+  return {
+    scope,
+    options: groups.map(g => ({
+      rot: norm180(-(g.angle + g.items.reduce((s, i) => s + norm180(i.rot - g.angle), 0) / g.items.length)),
+      count: g.items.length,
+      block: g.items[0].block,
+    })),
+  };
+}
+
+function renderNorthHint() {
+  const n = state.dxf && currentCrs().id === 'local' ? northOptions(state.northInserts, zoneRect()) : null;
+  state.north = n;
+  $('northHint').classList.toggle('hidden', !n);
+  $('northBtns').innerHTML = '';
+  if (!n) return;
+  const one = n.options[0];
+  if (n.options.length === 1) {
+    $('northText').textContent = `El plano trae una flecha de norte (bloque «${one.block}»): el dibujo está girado ${fmt(one.rot, 1)}° respecto del norte. Es un valor de partida: las flechas suelen estar puestas a ojo, así que compara en el mapa y ajústalo, o usa dos puntos de control para un giro exacto.`;
+  } else {
+    $('northText').textContent = `El plano trae flechas de norte ${n.scope} con giros distintos. Elige la del dibujo que estás convirtiendo y ajústala en el mapa si hace falta:`;
+  }
+  for (const o of n.options) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pick';
+    b.textContent = n.options.length === 1 ? 'Usar este giro' : `Usar ${fmt(o.rot, 1)}° (${o.block}, ${o.count})`;
+    b.addEventListener('click', () => useNorth(o.rot));
+    $('northBtns').appendChild(b);
+  }
+}
+
+function useNorth(rot) {
+  $('lRot').value = fmtIn(rot, 4);
+  state.northApplied = true;
+  rebuild(state.proj.length === 0);
+}
+
+function startPick(n, what) {
+  endPick();
+  state.picking = { n, what };
+  setView(what);
+  if (what === 'map') centerForPick(n);
+  $('main').classList.add('picking');
+  $('pickText').textContent = what === 'map'
+    ? `Punto ${n}: haz clic en el mapa satelital, en el mismo lugar que marcaste en el dibujo. Acerca el mapa todo lo que puedas.`
+    : `Punto ${n}: haz clic en el dibujo. El punto se ajusta al vértice más cercano.`;
+  $('pickBar').classList.remove('hidden');
+  updatePickButtons();
+}
+
+function startRect() {
+  endPick();
+  state.picking = { what: 'rect' };
+  setView('draw');
+  $('main').classList.add('picking');
+  $('pickText').textContent = 'Arrastra un rectángulo alrededor del dibujo que quieres convertir.';
+  $('pickBar').classList.remove('hidden');
+  if (dmap) dmap.dragging.disable();
+}
+
+function endPick() {
+  state.picking = null;
+  rectStart = null;
+  if (rectShape) { rectShape.remove(); rectShape = null; }
+  if (dmap) dmap.dragging.enable();
+  $('main').classList.remove('picking');
+  $('pickBar').classList.add('hidden');
+  updatePickButtons();
+  updateMapEmpty();
+}
+
+function updatePickButtons() {
+  const pk = state.picking;
+  for (const b of document.querySelectorAll('.pick[data-pick]')) b.classList.toggle('active', !!(pk && pk.n === +b.dataset.pick && pk.what === b.dataset.what));
+}
+
+// Vértice más cercano al clic, dentro de 12 píxeles de pantalla.
+function snapVertex(x, y) {
+  const tol = 12 / Math.pow(2, dmap.getZoom());
+  let best = null, bd = tol * tol;
+  for (const ft of state.feats) {
+    for (const p of srcArr(ft)) {
+      const d = (p[0] - x) * (p[0] - x) + (p[1] - y) * (p[1] - y);
+      if (d <= bd) { bd = d; best = p; }
+    }
+  }
+  return best || [x, y];
+}
+
+function onPick(where, e) {
+  const pk = state.picking;
+  if (!pk || pk.what !== where) return;
+  const n = pk.n;
+  if (where === 'draw') {
+    const p = snapVertex(e.latlng.lng, e.latlng.lat);
+    $(`p${n}x`).value = fmtIn(p[0], 4);
+    $(`p${n}y`).value = fmtIn(p[1], 4);
+  } else {
+    const r = lonLatToReal(e.latlng.lng, e.latlng.lat);
+    if (!r || !Number.isFinite(r[0])) { endPick(); msg('warn', 'Elige primero un sistema real válido para los puntos de control.'); return; }
+    $(`p${n}e`).value = fmtIn(r[0], 2);
+    $(`p${n}n`).value = fmtIn(r[1], 2);
+  }
+  endPick();
+  rebuild(state.proj.length === 0);
+}
+
+function onRectStart(e) {
+  if (!state.picking || state.picking.what !== 'rect') return;
+  rectStart = e.latlng;
+  rectShape = L.rectangle([rectStart, rectStart], { color: '#2dd4bf', weight: 2, fillOpacity: 0.08, interactive: false }).addTo(dmap);
+}
+function onRectMove(e) {
+  if (rectStart && rectShape) rectShape.setBounds([rectStart, e.latlng]);
+}
+function onRectEnd(e) {
+  if (!rectStart) return;
+  const a = rectStart, b = e.latlng;
+  const r = { x1: Math.min(a.lng, b.lng), x2: Math.max(a.lng, b.lng), y1: Math.min(a.lat, b.lat), y2: Math.max(a.lat, b.lat) };
+  endPick();
+  if (!(r.x2 > r.x1 && r.y2 > r.y1)) return;
+  state.zoneRect = r;
+  selectZone('custom');
+}
+
+// ---------------------------------------------------------------------------
+// Interfaz
+// ---------------------------------------------------------------------------
+const state = {
+  name: '', dxf: null, allFeats: [], feats: [], proj: [], layerOn: new Map(), measure: true,
+  detected: null, manualCrs: false, needsDetect: false,
+  zones: [], zoneIdx: -1, zoneRect: null, needsZones: false, needsDrawFit: false, pendingDrawFit: false,
+  view: 'map', picking: null, planCoords: [], northInserts: [], north: null, northApplied: false, autoMapShown: false, faceCache: null, shift: { e: 0, n: 0 },
+};
+let map = null, renderer = null;
+const groups = new Map();
+
+function readOpts() {
+  return {
+    texts: $('optTexts').checked,
+    expand: $('optExpand').checked,
+    blockPts: $('optBlockPts').checked,
+    polys: $('optPolys').checked,
+    fill: $('optFill').value,
+    faces: $('optFaces').checked,
+    measure: $('optMeasure').checked,
+    width: Math.min(10, Math.max(0.5, num($('optWidth').value, 2))),
+  };
+}
+
+const layerIsOn = name => state.layerOn.get(name) !== false;
+const visibleFeatures = opts => state.proj.filter(ft => layerIsOn(ft.layer) && (ft.kind !== 'text' || opts.texts));
+
+function msg(type, text, group, action) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + type;
+  d.dataset.group = group || 'build';
+  d.textContent = text;
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'linkbtn';
+    b.textContent = action.label;
+    b.addEventListener('click', action.run);
+    d.appendChild(b);
+  }
+  $('msgs').appendChild(d);
+}
+function clearMsgs(group) {
+  for (const el of [...$('msgs').children]) if (!group || el.dataset.group === group) el.remove();
+}
+
+// Número para un campo de texto, con coma decimal.
+const fmtIn = (v, dec) => String(Number(v.toFixed(dec))).replace('.', ',');
+
+function updateCrsUi() {
+  const crs = currentCrs();
+  const local = crs.id === 'local';
+  $('crsHint').textContent = crs.hint;
+  $('localPanel').classList.toggle('hidden', !local);
+  $('customDef').classList.toggle('hidden', !(crs.id === 'custom' || (local && $('localTarget').value === 'custom')));
+}
+
+function onCrsChange() {
+  const id = currentCrs().id;
+  state.manualCrs = true;
+  storeSet('dxf2kml.crs', id);
+  if (familyOf(id)) storeSet('dxf2kml.datum', familyOf(id));
+  updateCrsUi();
+  rebuild(true);
+}
+
+function setLocalInputs(L) {
+  for (const id of ['p1x', 'p1y', 'p1e', 'p1n', 'p2x', 'p2y', 'p2e', 'p2n']) $(id).value = '';
+  $('lRot').value = L ? fmtIn(L.rot, 6) : '0';
+  $('lScale').value = L ? fmtIn(L.scale, 9) : '1';
+  if (L) {
+    $('localTarget').value = L.targetId;
+    $('p1x').value = fmtIn(L.p1[0], 4);
+    $('p1y').value = fmtIn(L.p1[1], 4);
+    $('p1e').value = fmtIn(L.t1[0], 4);
+    $('p1n').value = fmtIn(L.t1[1], 4);
+  }
+}
+
+// Aplica al formulario el sistema detectado para el archivo cargado.
+// keepLocal: al cambiar de zona se conservan los puntos de control ya ingresados.
+function applyDetection(keepLocal) {
+  const d = state.detected;
+  if (!d) return;
+  if (d.custom) $('customDef').value = d.custom;
+  if (d.crsId === 'local') {
+    $('crs').value = 'local';
+    if (d.local || !keepLocal) setLocalInputs(d.local);
+  } else if (d.crsId) {
+    $('crs').value = d.crsId;
+  }
+  updateCrsUi();
+}
+
+function useDetected() {
+  state.manualCrs = false;
+  applyDetection();
+  rebuild(true);
+}
+
+function renderDetection() {
+  const d = state.dxf ? state.detected : null;
+  $('detect').classList.toggle('hidden', !d);
+  if (!d) return;
+  $('detect').classList.toggle('warn', !!d.warn);
+  $('detectChip').textContent = d.chip;
+  $('detectTitle').textContent = d.title;
+  $('detectReason').textContent = d.reason;
+  let note = '';
+  if (d.kind === 'utm') {
+    const crs = currentCrs();
+    const fam = familyOf(crs.id === 'local' ? $('localTarget').value : crs.id);
+    note = fam === 'psad56' || fam === 'sad69'
+      ? `Datum en uso: ${fam === 'psad56' ? 'PSAD56' : 'SAD69'}. Si el dibujo queda desplazado, prueba WGS84 / SIRGAS-Chile con la misma zona.`
+      : 'El datum no se puede detectar: se asume WGS84 / SIRGAS-Chile. Si el plano es antiguo y queda desplazado unos cientos de metros, elige PSAD56 o SAD69 con la misma zona.';
+  }
+  $('detectNote').textContent = note;
+  $('detectNote').classList.toggle('hidden', !note);
+  const detectedId = d.crsId || (d.custom ? 'custom' : null);
+  $('detectReset').classList.toggle('hidden', !(state.manualCrs && detectedId && !d.soft && currentCrs().id !== detectedId));
+}
+
+function updateLocalInfo(lp) {
+  const two = !!(lp && lp.twoPts);
+  $('lRot').readOnly = two;
+  $('lScale').readOnly = two;
+  for (const b of document.querySelectorAll('[data-nudge]')) b.disabled = two;
+  const info = $('localInfo');
+  if (!lp) { info.textContent = ''; return; }
+  if (two) {
+    $('lRot').value = fmtIn(lp.rot / DEG, 4);
+    $('lScale').value = fmtIn(lp.scale, 6);
+    info.textContent = 'Giro y escala calculados con los dos puntos.' + (Math.abs(lp.scale - 1) > 0.01 ? ' La escala se aleja de 1: revisa las unidades del dibujo o los puntos ingresados.' : '');
+  } else {
+    info.textContent = (lp.p2Partial ? 'El punto 2 está incompleto y no se usa. ' : '') + 'Con un solo punto el plano se traslada con el giro y la escala indicados; agrega un segundo punto para calcularlos.' + (state.northApplied && state.north ? ' El giro viene de la flecha de norte del plano.' : '');
+  }
+}
+
+function initCrs() {
+  const sel = $('crs'), target = $('localTarget');
+  for (const c of CRS_LIST) {
+    sel.appendChild(new Option(c.label, c.id));
+    if (c.id !== 'geo' && c.id !== 'local') target.appendChild(new Option(c.label, c.id));
+  }
+  const saved = storeGet('dxf2kml.crs');
+  if (saved && CRS_LIST.some(c => c.id === saved)) sel.value = saved;
+  const savedTarget = storeGet('dxf2kml.localTarget');
+  if (savedTarget && CRS_LIST.some(c => c.id === savedTarget)) target.value = savedTarget;
+  $('customDef').value = storeGet('dxf2kml.custom') || '';
+  updateCrsUi();
+}
+
+function initMap() {
+  if (typeof L === 'undefined') {
+    $('mapEmpty').querySelector('span').textContent = 'No se pudo cargar el mapa. La conversión igual funciona.';
+    return;
+  }
+  map = L.map('map', { preferCanvas: true }).setView([-35.5, -71.5], 5);
+  const esri = service => `https://server.arcgisonline.com/ArcGIS/rest/services/${service}/MapServer/tile/{z}/{y}/{x}`;
+  const imagery = () => L.tileLayer(esri('World_Imagery'), { maxZoom: 20, maxNativeZoom: 18, attribution: 'Imágenes © Esri' });
+  // Como la vista híbrida de Google: satélite con rutas y nombres de localidades encima.
+  const hybrid = L.layerGroup([
+    imagery(),
+    L.tileLayer(esri('Reference/World_Transportation'), { maxZoom: 20, maxNativeZoom: 18 }),
+    L.tileLayer(esri('Reference/World_Boundaries_and_Places'), { maxZoom: 20, maxNativeZoom: 18 }),
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 20, maxNativeZoom: 20, attribution: 'Nombres © OpenStreetMap, © CARTO' }),
+  ]);
+  const sat = imagery();
+  const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, attribution: '© OpenStreetMap' });
+  hybrid.addTo(map);
+  L.control.layers({ 'Satélite con nombres': hybrid, 'Satélite': sat, 'Mapa': osm }, null, { position: 'topright' }).addTo(map);
+  L.control.scale({ imperial: false }).addTo(map);
+  renderer = L.canvas({ padding: 0.5 });
+  mapMarks.addTo(map);
+  planMark.addTo(map);
+  map.on('click', e => onPick('map', e));
+}
+
+// El aviso central del mapa solo aparece cuando no hay nada que mirar ni un punto por elegir.
+function updateMapEmpty() {
+  const marks = (mapMarks && mapMarks.getLayers().length) || (planMark && planMark.getLayers().length);
+  $('mapEmpty').classList.toggle('hidden', !map || state.view !== 'map' || state.proj.length > 0 || !!state.picking || !!marks);
+  $('imgNote').classList.toggle('hidden', !map || state.view !== 'map' || !state.proj.length);
+}
+
+function renderMap(fit) {
+  updateMapEmpty();
+  if (map) {
+    $('mapEmpty').querySelector('span').textContent = state.dxf && currentCrs().id === 'local'
+      ? 'Ingresa un punto de control para ver el plano'
+      : 'La vista previa aparecerá aquí';
+  }
+  if (!map) return;
+  for (const g of groups.values()) g.remove();
+  groups.clear();
+  const opts = readOpts();
+  for (const ft of state.proj) {
+    if (ft.kind === 'text' && !opts.texts) continue;
+    let g = groups.get(ft.layer);
+    if (!g) { g = L.layerGroup(); groups.set(ft.layer, g); }
+    if (ft.kind === 'line') {
+      const ll = ft.ll.map(p => [p[1], p[0]]);
+      const style = { renderer, color: ft.color, weight: opts.width, opacity: 0.95 };
+      L.polyline(ll, { renderer, color: '#121714', weight: opts.width + 3, opacity: 0.45, interactive: false }).addTo(g);
+      if (ft.closed && opts.polys && !ft.noFill) {
+        L.polygon(ll, Object.assign(style, { fillColor: opts.fill === 'auto' && ft.fill ? ft.fill : ft.color, fillOpacity: 0.45 }))
+          .bindTooltip(esc(ft.name || ft.label), { sticky: true })
+          .addTo(g);
+      } else {
+        L.polyline(ll, style).addTo(g);
+      }
+    } else {
+      const m = L.circleMarker([ft.p[1], ft.p[0]], { renderer, radius: ft.kind === 'text' ? 2.5 : 4, color: ft.color, weight: 1, fillColor: ft.color, fillOpacity: 0.9 });
+      m.bindTooltip(esc(ft.kind === 'text' ? ft.text : ft.name));
+      m.addTo(g);
+    }
+  }
+  for (const [name, g] of groups) if (layerIsOn(name)) g.addTo(map);
+  if (fit) fitMap();
+}
+
+let pendingFit = false, sizeWatch = null;
+function fitMap() {
+  if (!map || !state.proj.length) return;
+  // Si el contenedor aún no tiene tamaño (p. ej. la pestaña se está dibujando), se encuadra al tenerlo.
+  if (!sizeWatch && typeof ResizeObserver !== 'undefined') {
+    sizeWatch = new ResizeObserver(() => { map.invalidateSize(false); if (pendingFit) fitMap(); });
+    sizeWatch.observe($('map'));
+  }
+  map.invalidateSize(false);
+  const size = map.getSize();
+  if (!size.x || !size.y) { pendingFit = true; return; }
+  pendingFit = false;
+  const { xs, ys } = sampleMedian(state.proj, ft => (ft.kind === 'line' ? ft.ll : [ft.p]));
+  xs.sort((a, b) => a - b);
+  ys.sort((a, b) => a - b);
+  const cut = xs.length > 50 ? 0.01 : 0; // ignora elementos sueltos muy alejados
+  const bounds = L.latLngBounds([quant(ys, cut), quant(xs, cut)], [quant(ys, 1 - cut), quant(xs, 1 - cut)]);
+  map.fitBounds(bounds.pad(0.08), { maxZoom: 19 });
+}
+
+function renderLayers() {
+  const box = $('layers');
+  box.innerHTML = '';
+  const info = new Map();
+  for (const ft of state.feats) {
+    const it = info.get(ft.layer);
+    if (it) it.count++;
+    else info.set(ft.layer, { count: 1, color: ft.color });
+  }
+  if (!info.size) {
+    box.innerHTML = `<div class="empty">${state.dxf ? 'No hay elementos para exportar.' : 'Sube un archivo para ver sus capas.'}</div>`;
+    $('layerTools').classList.add('hidden');
+    return;
+  }
+  const names = [...info.keys()].sort(byName);
+  for (const name of names) {
+    const def = state.dxf.layers.get(name);
+    if (!state.layerOn.has(name)) state.layerOn.set(name, !(def && (def.off || def.frozen)));
+    const row = document.createElement('label');
+    row.className = 'layer';
+    const tag = def && def.frozen ? '<span class="tag">inutilizada</span>' : def && def.off ? '<span class="tag">apagada</span>' : '';
+    row.innerHTML = `<input type="checkbox"${layerIsOn(name) ? ' checked' : ''}><span class="sw" style="background:${def ? def.color : info.get(name).color}"></span><span class="name" title="${esc(name)}">${esc(name)}</span>${tag}<span class="count">${info.get(name).count.toLocaleString('es-CL')}</span>`;
+    row.querySelector('input').addEventListener('change', e => {
+      state.layerOn.set(name, e.target.checked);
+      const g = groups.get(name);
+      if (g && map) { if (e.target.checked) g.addTo(map); else g.remove(); }
+      updateSummary();
+      renderDraw();
+    });
+    box.appendChild(row);
+  }
+  $('layerTools').classList.remove('hidden');
+  $('layerCount').textContent = names.length === 1 ? '1 capa' : `${names.length} capas`;
+}
+
+function setAllLayers(on) {
+  for (const name of state.layerOn.keys()) state.layerOn.set(name, on);
+  for (const input of $('layers').querySelectorAll('input')) input.checked = on;
+  if (map) for (const g of groups.values()) { if (on) g.addTo(map); else g.remove(); }
+  updateSummary();
+  renderDraw();
+}
+
+function updateSummary() {
+  if (!state.dxf) {
+    $('download').disabled = true;
+    $('summary').textContent = 'Sube un archivo para comenzar.';
+    return;
+  }
+  const vis = visibleFeatures(readOpts());
+  const layers = new Set(vis.map(ft => ft.layer)).size;
+  $('download').disabled = vis.length === 0;
+  $('summary').textContent = vis.length
+    ? `${vis.length.toLocaleString('es-CL')} elementos en ${layers} ${layers === 1 ? 'capa' : 'capas'}`
+    : 'No hay elementos seleccionados para exportar.';
+}
+
+const SKIP_NAMES = { HATCH: 'sombreados', DIMENSION: 'cotas', LEADER: 'directrices', MULTILEADER: 'directrices múltiples', MLEADER: 'directrices múltiples', SOLID: 'sólidos 2D', '3DFACE': 'caras 3D', '3DSOLID': 'sólidos 3D', REGION: 'regiones', IMAGE: 'imágenes', WIPEOUT: 'coberturas', MLINE: 'multilíneas', MESH: 'mallas', TABLE: 'tablas', OLE2FRAME: 'objetos OLE', ACAD_TABLE: 'tablas', RAY: 'rayos', XLINE: 'líneas auxiliares', TOLERANCE: 'tolerancias' };
+
+function rebuild(fit) {
+  clearMsgs('build');
+  if (!state.dxf) { renderDetection(); renderZones(); renderDraw(); return; }
+  const opts = readOpts();
+  const { feats: all, stats } = extract(state.dxf, opts);
+  state.allFeats = all;
+  if (state.needsZones) {
+    state.needsZones = false;
+    state.zones = findZones(all);
+    state.planCoords = findPlanCoords(all);
+    state.northInserts = findNorthInserts(state.dxf);
+    renderZones();
+  }
+  const zone = zoneRect();
+  let feats = zone ? all.filter(ft => inZone(ft, zone)) : all;
+  // Figuras que forman las líneas sueltas (servidumbres, franjas). Se arman por dibujo:
+  // con una zona elegida, en esa zona; sin zona, en cada dibujo del archivo por separado.
+  if (opts.faces) {
+    const key = [state.name, state.zoneIdx, JSON.stringify(state.zoneRect), opts.expand, opts.blockPts].join('|');
+    if (!state.faceCache || state.faceCache.key !== key) {
+      const groups = zone || state.zones.length < 2 ? [feats] : state.zones.map(z => all.filter(ft => inZone(ft, z)));
+      const acc = { key, feats: [], split: [] };
+      for (const g of groups) {
+        const r = faceFeatures(g);
+        acc.feats.push(...r.feats);
+        acc.split.push(...r.split);
+      }
+      state.faceCache = acc;
+    }
+    // Un lote dividido por otras líneas se reemplaza por sus partes: queda solo su contorno, sin relleno.
+    const split = new Set(state.faceCache.split);
+    for (const ft of feats) if (ft.kind === 'line' && ft.closed && split.has(polyKey(ft))) ft.noFill = true;
+    if (state.faceCache.feats.length) feats = feats.concat(state.faceCache.feats);
+  }
+  if (feats !== all) nameAndColorPolygons(feats);
+  state.feats = feats;
+  if (state.needsDetect) {
+    state.needsDetect = false;
+    const wasLocal = currentCrs().id === 'local';
+    state.detected = detectCrs(state.dxf, feats);
+    applyDetection(wasLocal);
+  }
+  renderDetection();
+  renderCoordHint();
+  renderNorthHint();
+  if (state.north && state.north.options.length === 1 && !state.northApplied && currentCrs().id === 'local' && !parseNum($('lRot').value)) {
+    state.northApplied = true;
+    $('lRot').value = fmtIn(state.north.options[0].rot, 4);
+  }
+  const crs = currentCrs();
+
+  let res = { feats: [], bad: 0 }, problem = null;
+  try {
+    const pipe = getPipeline(crs);
+    state.measure = pipe.measure;
+    updateLocalInfo(pipe.local);
+    res = projectAll(feats, pipe);
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    problem = e.message;
+    updateLocalInfo(null);
+  }
+  state.proj = res.feats;
+  renderLayers();
+  renderMap(fit);
+  updateSummary();
+  renderDraw();
+  updateMapEmpty();
+  // La primera vez que el plano queda ubicado, conviene ver el mapa.
+  if (!state.autoMapShown && state.proj.length && state.view === 'draw' && !state.picking) {
+    state.autoMapShown = true;
+    setView('map');
+  }
+  if (state.needsDrawFit) { state.needsDrawFit = false; fitDraw(); }
+  if (problem) msg('warn', problem);
+  if (state.zones.length >= 2 && !zone) {
+    msg('warn', `El archivo tiene ${state.zones.length} dibujos separados. Si no forman parte del mismo plano, elige una zona en el paso 2 para no mezclarlos en el KML.`);
+  }
+
+  if (!feats.length) {
+    msg('warn', 'No se encontraron elementos dibujables en el espacio modelo del plano.');
+    return;
+  }
+
+  const d = state.detected;
+  const detectedId = d && (d.crsId || (d.custom ? 'custom' : null));
+  if (state.manualCrs && detectedId && !d.soft && crs.id !== detectedId && !(zoneOf(crs.id) && zoneOf(crs.id) === zoneOf(detectedId))) {
+    msg('warn', `El sistema elegido no coincide con el detectado (${d.title}).`, 'build', { label: 'Usar el sistema detectado', run: useDetected });
+  }
+  if (res.feats.length && !(d && d.warn && !state.manualCrs)) {
+    if (chileFraction(samplePts(res.feats, llArr, 2000), p => p) < 0.5) {
+      msg('warn', 'La mayor parte del dibujo queda fuera de Chile. Revisa el sistema de coordenadas en el paso 3.');
+    }
+  }
+  if (res.bad) msg('warn', `${res.bad.toLocaleString('es-CL')} elementos tenían coordenadas que no se pudieron convertir y se omitieron.`);
+  if (stats.xrefs.size) msg('warn', `El plano tiene referencias externas que no se incluyen (${[...stats.xrefs].join(', ')}). En AutoCAD, únelas al dibujo con "Unir" en el administrador de referencias externas antes de exportar.`);
+  if (stats.missing.size) msg('info', `Hay bloques sin definición en el archivo: ${[...stats.missing].slice(0, 5).join(', ')}${stats.missing.size > 5 ? '…' : ''}.`);
+
+  const skipped = Object.entries(state.dxf.skipped);
+  if (skipped.length) {
+    const txt = skipped.sort((a, b) => b[1] - a[1]).map(([t, n]) => `${n.toLocaleString('es-CL')} ${SKIP_NAMES[t] || t}`).join(', ');
+    msg('info', `Elementos omitidos: ${txt}.`);
+  }
+}
+
+async function loadFile(file) {
+  clearMsgs();
+  if (!file) return;
+  if (/\.dwg$/i.test(file.name)) {
+    msg('err', 'Los archivos DWG no se pueden leer directamente. Ábrelo en AutoCAD y usa Guardar como → AutoCAD 2018 DXF (*.dxf).', 'file');
+    return;
+  }
+  const label = $('fileName');
+  label.classList.remove('hidden');
+  label.textContent = `${file.name} · procesando…`;
+  $('summary').textContent = 'Leyendo archivo…';
+  $('download').disabled = true;
+  await new Promise(r => setTimeout(r, 20));
+  try {
+    const dxf = parseDxf(decodeFile(await file.arrayBuffer()));
+    state.dxf = dxf;
+    state.name = file.name;
+    state.layerOn = new Map();
+    state.detected = null;
+    state.needsDetect = true;
+    state.manualCrs = false;
+    state.allFeats = [];
+    state.zones = [];
+    state.zoneIdx = -1;
+    state.zoneRect = null;
+    state.planCoords = [];
+    state.northInserts = [];
+    state.north = null;
+    state.northApplied = false;
+    state.autoMapShown = false;
+    state.faceCache = null;
+    state.shift = { e: 0, n: 0 };
+    if (planMark) planMark.clearLayers();
+    state.needsZones = true;
+    state.needsDrawFit = true;
+    endPick();
+    setLocalInputs(null);
+    const mb = file.size / 1048576;
+    label.textContent = `${file.name} · ${mb >= 1 ? fmt(mb, 1) + ' MB' : Math.max(1, Math.round(file.size / 1024)) + ' KB'}`;
+    $('howto').open = false;
+    rebuild(true);
+    $('viewTabs').classList.remove('hidden');
+    $('shiftBox').classList.remove('hidden');
+    renderShift();
+    // Sin ubicación todavía, lo útil es ver el dibujo; con ubicación, el mapa.
+    setView(state.proj.length ? 'map' : 'draw');
+  } catch (e) {
+    console.error(e);
+    state.dxf = null; state.feats = []; state.proj = [];
+    label.textContent = file.name;
+    state.allFeats = []; state.zones = []; state.zoneIdx = -1; state.zoneRect = null;
+    renderLayers(); renderMap(false); updateSummary(); renderDetection(); renderZones(); renderDraw();
+    $('viewTabs').classList.add('hidden');
+    $('shiftBox').classList.add('hidden');
+    setView('map');
+    msg('err', e instanceof UserError ? e.message : 'No se pudo leer el archivo: ' + e.message, 'file');
+  }
+}
+
+function download() {
+  if (!state.dxf) return;
+  const kml = buildKml();
+  const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = state.name.replace(/\.dxf$/i, '') + '.kml';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+// ---------------------------------------------------------------------------
+// Eventos
+// ---------------------------------------------------------------------------
+initCrs();
+initMap();
+initDrawMap();
+
+$('file').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove('over')));
+drop.addEventListener('drop', e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]); });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
+$('crs').addEventListener('change', onCrsChange);
+$('detectReset').addEventListener('click', useDetected);
+for (const b of $('viewTabs').querySelectorAll('button')) {
+  b.addEventListener('click', () => { endPick(); setView(b.dataset.view); });
+}
+for (const b of document.querySelectorAll('.pick[data-pick]')) {
+  b.addEventListener('click', () => {
+    const pk = state.picking;
+    if (pk && pk.n === +b.dataset.pick && pk.what === b.dataset.what) endPick();
+    else startPick(+b.dataset.pick, b.dataset.what);
+  });
+}
+$('pickCancel').addEventListener('click', endPick);
+for (const b of document.querySelectorAll('[data-nudge]')) {
+  b.addEventListener('click', () => {
+    const cur = parseNum($('lRot').value);
+    $('lRot').value = fmtIn((Number.isFinite(cur) ? cur : 0) + parseFloat(b.dataset.nudge), 4);
+    state.northApplied = true;
+    rebuild(false);
+  });
+}
+$('zoneDraw').addEventListener('click', startRect);
+
+$('coordUse').addEventListener('click', () => {
+  const c = state.planCoords[0];
+  if (!c) return;
+  const id = c.zone && c.south ? utmId(familyOf($('localTarget').value) || 'wgs84', c.zone) : null;
+  if (id && id !== $('localTarget').value) {
+    $('localTarget').value = id;
+    storeSet('dxf2kml.localTarget', id);
+    updateCrsUi();
+  }
+  $('p1e').value = fmtIn(c.e, 2);
+  $('p1n').value = fmtIn(c.n, 2);
+  rebuild(state.proj.length === 0);
+});
+$('coordShow').addEventListener('click', () => {
+  const c = state.planCoords[0];
+  const ll = c && planCoordLonLat(c);
+  if (!ll || !map) return;
+  endPick();
+  setView('map');
+  planMark.clearLayers();
+  L.circleMarker([ll[1], ll[0]], { radius: 7, color: '#fff', weight: 2, fillColor: '#f59e0b', fillOpacity: 1, interactive: false })
+    .bindTooltip('Coordenada del plano', { permanent: true, direction: 'right', offset: [8, 0], className: 'cp-label' })
+    .addTo(planMark);
+  updateMapEmpty();
+  map.setView([ll[1], ll[0]], 17);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.picking) endPick(); });
+$('localTarget').addEventListener('change', () => {
+  const id = $('localTarget').value;
+  storeSet('dxf2kml.localTarget', id);
+  if (familyOf(id)) storeSet('dxf2kml.datum', familyOf(id));
+  updateCrsUi();
+  rebuild(true);
+});
+let localTimer = null;
+for (const id of ['p1x', 'p1y', 'p1e', 'p1n', 'p2x', 'p2y', 'p2e', 'p2n', 'lRot', 'lScale']) {
+  $(id).addEventListener('input', () => {
+    clearTimeout(localTimer);
+    localTimer = setTimeout(() => rebuild(true), 450);
+  });
+}
+let customTimer = null;
+$('customDef').addEventListener('input', () => {
+  storeSet('dxf2kml.custom', $('customDef').value);
+  clearTimeout(customTimer);
+  customTimer = setTimeout(() => rebuild(true), 500);
+});
+
+$('optTexts').addEventListener('change', () => { renderMap(false); updateSummary(); renderDraw(); });
+$('optPolys').addEventListener('change', () => renderMap(false));
+$('optFill').addEventListener('change', () => renderMap(false));
+$('optFaces').addEventListener('change', () => rebuild(false));
+for (const b of document.querySelectorAll('[data-shift]')) {
+  b.addEventListener('click', () => {
+    const step = parseFloat($('shiftStep').value) || 1;
+    const d = b.dataset.shift.split(',').map(Number);
+    state.shift = { e: state.shift.e + d[0] * step, n: state.shift.n + d[1] * step };
+    renderShift();
+    rebuild(false);
+  });
+}
+$('shiftReset').addEventListener('click', () => {
+  state.shift = { e: 0, n: 0 };
+  renderShift();
+  rebuild(false);
+});
+$('optWidth').addEventListener('change', () => renderMap(false));
+$('optExpand').addEventListener('change', () => rebuild(false));
+$('optBlockPts').addEventListener('change', () => rebuild(false));
+$('allOn').addEventListener('click', () => setAllLayers(true));
+$('allOff').addEventListener('click', () => setAllLayers(false));
+$('download').addEventListener('click', download);
+
+if (typeof proj4 === 'undefined') msg('err', 'No se pudo cargar la librería de coordenadas. Revisa tu conexión a internet y recarga la página.', 'file');
+
+// Acceso para pruebas desde la consola del navegador.
+window.dxf2kml = { state, buildKml, loadFile, selectZone, get map() { return map; }, get dmap() { return dmap; } };
+})();
+</script>
+</body>
+</html>

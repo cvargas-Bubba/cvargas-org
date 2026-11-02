@@ -1,17 +1,55 @@
-# Sitio del taller — cvargas.org
+# cvargas.org
 
-Página del taller de muebles: trabajos, contacto por WhatsApp y enlaces a las
-herramientas. Sitio estático, sin framework ni build.
+Un dominio, un repositorio, varias aplicaciones. La raíz es un **índice**: las
+tarjetas de cada módulo y el ingreso. Sitio estático, sin framework ni build.
 
-## Cómo cambiar el contenido
+## Estructura
 
-**Todo se edita en [`datos.js`](datos.js)**, que es el único archivo que hace
-falta tocar: nombre, textos, teléfono, trabajos y herramientas. Lo demás se
-arma solo con eso.
+| Carpeta | Dirección | Qué es |
+|---|---|---|
+| `/` | cvargas.org | el índice de aplicaciones |
+| `fierro-y-veta/` | cvargas.org/fierro-y-veta | la página del taller de muebles |
+| `muebles/` | cvargas.org/muebles | el cotizador de muebles (privado) |
+| `dxf-kml/` | cvargas.org/dxf-kml | conversor de planos DXF a KML |
+| `aridos/` | cvargas.org/aridos | prototipo de venta de áridos |
+| `marca/` | | el logo, compartido por todo el sitio |
+
+Las rutas distinguen mayúsculas: `cvargas.org/muebles` funciona y
+`cvargas.org/Muebles` no. Por eso van en minúscula.
+
+Un módulo nuevo es una carpeta más con su `index.html` y una entrada en la
+lista `MODULOS` de [`indice.js`](indice.js). Un solo repositorio, un solo
+certificado y un solo despliegue; la contra es que un cambio en cualquier
+módulo reconstruye el sitio entero.
+
+`dxf-kml/` y `aridos/` son **copias** de sus repositorios
+([conversor-dxf-kml](https://github.com/cvargas-Bubba/conversor-dxf-kml),
+[patio-de-aridos](https://github.com/cvargas-Bubba/patio-de-aridos)): son
+páginas de un solo archivo y se trajeron tal cual para que vivan en este
+dominio. Si se edita el repositorio original, hay que volver a copiar el
+`index.html`; lo que manda en cvargas.org es la copia de acá.
+
+## El ingreso
+
+La sesión es de **todo el dominio**: se entra una vez en el índice —o en el
+cotizador— y vale para las dos partes. Las aplicaciones marcadas con
+`privada: true` en `indice.js` aparecen con candado mientras no haya sesión.
+
+La cuenta y la base de datos están en Firebase, en el proyecto
+`fierro-y-veta`. La configuración va escrita en
+[`muebles/nube.js`](muebles/nube.js), a la vista: son datos públicos. Lo que
+cuida los datos son las reglas de Firestore —cada usuario lee y escribe solo lo
+suyo— y la contraseña. Los usuarios se crean a mano en la consola de Firebase,
+en Authentication → Users: el registro desde fuera está desactivado.
+
+## La página del taller
+
+**Todo su contenido se edita en [`fierro-y-veta/datos.js`](fierro-y-veta/datos.js)**:
+nombre, textos, teléfono, trabajos y herramientas. Lo demás se arma solo.
 
 ### Poner el WhatsApp
 
-En `datos.js`, el teléfono va en formato internacional, sin `+` ni espacios:
+El teléfono va en formato internacional, sin `+` ni espacios:
 
 ```js
 telefono: "56912345678",
@@ -22,7 +60,7 @@ preferible a publicar un enlace que no lleva a ninguna parte.
 
 ### Agregar fotos de trabajos
 
-1. Copia las fotos a la carpeta `fotos/`.
+1. Copia las fotos a `fierro-y-veta/fotos/`.
 2. En `datos.js`, escribe el nombre del archivo en la entrada correspondiente:
 
 ```js
@@ -33,48 +71,16 @@ Un trabajo sin foto, o cuya foto no cargue, muestra igual su recuadro con el
 título, así que la grilla nunca se ve rota. Conviene que las fotos sean
 horizontales y de menos de 1 MB para que la página cargue rápido.
 
-### Sacar una herramienta de la lista
-
-Cambia su `mostrar` a `false`.
-
-## Archivos
-
-| Archivo | Qué contiene |
-|---|---|
-| `datos.js` | todo el contenido editable |
-| `sitio.js` | arma la página con esos datos |
-| `index.html` | estructura |
-| `estilos.css` | estilos |
-| `fotos/` | las imágenes de los trabajos |
-| `marca/` | el logo: monograma recortado para la web y logo completo para el PDF |
-
 ## El logo
 
 `marca/fv-monograma.png` es el monograma con fondo transparente, que es el que
-va en el encabezado: el logo completo viene sobre blanco y en un sitio oscuro
+va en los encabezados: el logo completo viene sobre blanco y en un sitio oscuro
 se vería como un recuadro.
 
 `marca/logo-fierro-veta.jpg` es el logo entero, para el PDF del cotizador, que
 va sobre papel blanco. Se carga una vez en el cotizador, en **Empresa → Logo**,
 y queda guardado en ese navegador. Se puede descargar desde
 <https://cvargas.org/marca/logo-fierro-veta.jpg>.
-
-## Módulos
-
-Cada módulo vive en una carpeta y se sirve como ruta del mismo dominio:
-
-| Carpeta | Dirección |
-|---|---|
-| `/` | cvargas.org |
-| `muebles/` | cvargas.org/muebles |
-
-Los módulos nuevos van igual: una carpeta más, y una entrada en `apps` dentro
-de `datos.js` para que aparezcan en la página. Un solo repositorio, un solo
-certificado y un solo despliegue; la contra es que un cambio en cualquier
-módulo reconstruye el sitio entero.
-
-Las rutas distinguen mayúsculas: `cvargas.org/muebles` funciona y
-`cvargas.org/Muebles` no. Por eso van en minúscula.
 
 ## Publicación
 

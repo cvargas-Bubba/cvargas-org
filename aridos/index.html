@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Patio de Áridos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: patio de faena — franja de maquinaria arriba, catálogo con texturas de grano a la izquierda, pedido fijo a la derecha; el vendedor ve una mesa de despacho. */
+:root {
+  --bg: #ECEEEC;
+  --surface: #FFFFFF;
+  --surface-2: #F5F6F5;
+  --ink: #1C2225;
+  --muted: #5B6569;
+  --line: #D3D8D6;
+  --accent: #F2B705;
+  --accent-ink: #1C2225;
+  --accent-soft: #FFF2C2;
+  --head-bg: #1C2225;
+  --head-fg: #F2F3F1;
+  --head-muted: #A7B0B3;
+  --ok: #2B7A4B;  --ok-soft: #DDF0E4;
+  --warn: #9A5B00; --warn-soft: #FBEBCF;
+  --bad: #B3261E; --bad-soft: #F8DEDC;
+  --info: #2C5C8A; --info-soft: #DCE8F4;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131819; --surface: #1C2326; --surface-2: #222A2D; --ink: #E6EAE9; --muted: #98A3A6; --line: #2E373B;
+    --accent: #F2B705; --accent-ink: #131819; --accent-soft: #3A3010;
+    --head-bg: #0C1011; --head-fg: #F2F3F1; --head-muted: #8E989B;
+    --ok: #63C58F; --ok-soft: #173326; --warn: #EBA642; --warn-soft: #3A2A10;
+    --bad: #F2857C; --bad-soft: #3D1A18; --info: #82B3E3; --info-soft: #172A3D;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131819; --surface: #1C2326; --surface-2: #222A2D; --ink: #E6EAE9; --muted: #98A3A6; --line: #2E373B;
+  --accent: #F2B705; --accent-ink: #131819; --accent-soft: #3A3010;
+  --head-bg: #0C1011; --head-fg: #F2F3F1; --head-muted: #8E989B;
+  --ok: #63C58F; --ok-soft: #173326; --warn: #EBA642; --warn-soft: #3A2A10;
+  --bad: #F2857C; --bad-soft: #3D1A18; --info: #82B3E3; --info-soft: #172A3D;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--head-bg); }
+.wrap { max-width: 1240px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--font-display); font-variation-settings: "wdth" 112; margin: 0; text-wrap: balance; line-height: 1.15; }
+h2 { font-size: 1.35rem; font-weight: 800; }
+h3 { font-size: 1.02rem; font-weight: 700; }
+p { margin: 0; }
+small, .muted { color: var(--muted); }
+.num, .mono { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); font-size: .88em; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* Header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--head-bg); color: var(--head-fg); }
+.top::after { content: ""; display: block; height: 6px; background: repeating-linear-gradient(-45deg, var(--accent) 0 12px, var(--head-bg) 12px 24px); }
+.top-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand b { display: block; font-family: var(--font-display); font-variation-settings: "wdth" 125; font-weight: 900; font-size: 1.25rem; letter-spacing: .01em; text-transform: uppercase; line-height: 1; }
+.brand small { color: var(--head-muted); font-size: .8rem; }
+.seg { display: inline-flex; background: rgba(255,255,255,.08); border-radius: 999px; padding: 4px; gap: 4px; }
+.seg button { border: 0; background: transparent; color: var(--head-fg); padding: 7px 16px; border-radius: 999px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--bad); color: #fff; font-size: .72rem; font-weight: 700; }
+.demo { display: flex; gap: 8px; align-items: center; padding-block: 10px; font-size: .85rem; color: var(--muted); }
+.demo::before { content: "PROTOTIPO"; font-family: var(--font-mono); font-size: .7rem; letter-spacing: .08em; background: var(--accent-soft); color: var(--ink); padding: 2px 8px; border-radius: 4px; flex: none; }
+
+main { padding-block: 8px 64px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 20px; overflow-x: auto; }
+.tabs button { border: 0; background: none; padding: 10px 14px; cursor: pointer; font-weight: 600; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap; display: inline-flex; gap: 8px; align-items: center; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.count { font-size: .75rem; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; color: var(--muted); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.sec-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.pri:hover { filter: brightness(.96); }
+.btn.dark { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.btn.sm { padding: 5px 10px; font-size: .85rem; }
+.btn.ghost { background: transparent; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.block { width: 100%; padding: 12px; font-size: 1rem; }
+
+/* Client shop */
+.shop { display: grid; grid-template-columns: minmax(0, 1fr) 370px; grid-template-areas: "main side" "form side"; gap: 28px 24px; align-items: start; }
+.col { grid-area: main; display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+.shop > .cart { grid-area: side; }
+.shop > .entrega { grid-area: form; }
+.cart { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 90px); }
+.mbar, .ag-list, .m-only { display: none; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.mat { display: flex; flex-direction: column; overflow: hidden; }
+.mat.off { opacity: .6; }
+.grain { height: 92px; background-color: var(--c1);
+  background-image: radial-gradient(var(--c2) 1.1px, transparent 1.6px), radial-gradient(var(--c3) 1px, transparent 1.5px), radial-gradient(var(--c2) 2px, transparent 2.7px);
+  background-size: 6px 6px, 9px 9px, 21px 21px; background-position: 0 0, 3px 4px, 8px 2px; }
+.grain.coarse { background-image: radial-gradient(var(--c3) 3px, transparent 4px), radial-gradient(var(--c2) 4px, transparent 5px), radial-gradient(var(--c2) 1.5px, transparent 2px);
+  background-size: 17px 17px, 27px 27px, 7px 7px; background-position: 0 0, 9px 12px, 2px 3px; }
+.grain.fine { background-size: 4px 4px, 6px 6px, 13px 13px; }
+.mat-b { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.mat-b p { font-size: .86rem; color: var(--muted); flex: 1; }
+.mat-f { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; min-height: 36px; }
+.price b { font-family: var(--font-display); font-variation-settings: "wdth" 100; font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.price span { color: var(--muted); font-size: .82rem; }
+.step { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.step button { border: 0; background: var(--surface-2); width: 32px; height: 34px; cursor: pointer; font-size: 1.1rem; font-weight: 700; }
+.step span { min-width: 58px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; font-size: .9rem; }
+
+.calc { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.calc-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.calc-out { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--surface-2); border-radius: 8px; padding: 12px 14px; }
+.calc-out b { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: .82rem; font-weight: 600; color: var(--muted); min-width: 0; }
+.f input, .f select, .f textarea { border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; background: var(--surface); color: var(--ink); font-weight: 400; font-size: .95rem; width: 100%; }
+.f textarea { min-height: 70px; resize: vertical; }
+fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+legend { font-size: .82rem; font-weight: 600; color: var(--muted); padding: 0; margin-bottom: 6px; }
+.choices { display: flex; gap: 8px; flex-wrap: wrap; }
+.choice { flex: 1 1 140px; display: flex; gap: 8px; align-items: flex-start; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; background: var(--surface); }
+.choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.choice input { margin-top: 3px; accent-color: var(--ink); }
+.choice b { display: block; font-size: .92rem; }
+.choice small { font-size: .8rem; }
+
+.entrega { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 100px); padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.form-grid .wide { grid-column: 1 / -1; }
+
+.cart { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 92px); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.cart-empty { color: var(--muted); font-size: .9rem; padding: 14px; background: var(--surface-2); border-radius: 8px; }
+.lines { display: flex; flex-direction: column; gap: 8px; }
+.line { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; font-size: .92rem; }
+.dot { width: 14px; height: 14px; border-radius: 4px; background: var(--c1); }
+.x { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px 6px; font-size: 1rem; }
+.truck { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 8px; background: var(--surface-2); font-size: .86rem; }
+.truck-top { display: flex; gap: 10px; align-items: center; }
+.loads { display: flex; gap: 4px; }
+.load { flex: 1; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.load i { display: block; height: 100%; background: var(--accent); }
+.tot { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--line); padding-top: 12px; }
+.tot div { display: flex; justify-content: space-between; font-size: .92rem; font-variant-numeric: tabular-nums; }
+.tot .big { font-size: 1.15rem; font-weight: 800; padding-top: 6px; }
+.tot .big span:last-child { font-family: var(--font-display); font-size: 1.35rem; }
+.warnbox { font-size: .84rem; color: var(--warn); background: var(--warn-soft); border-radius: 8px; padding: 8px 10px; }
+
+/* Orders (client) */
+.orders { display: flex; flex-direction: column; gap: 14px; max-width: 860px; }
+.order { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.order-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.track { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.track div { display: flex; flex-direction: column; gap: 6px; font-size: .8rem; color: var(--muted); }
+.track div::before { content: ""; height: 6px; border-radius: 3px; background: var(--line); }
+.track div.done { color: var(--ink); font-weight: 600; }
+.track div.done::before { background: var(--accent); }
+.kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; font-size: .9rem; }
+.kv span { display: block; font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: .78rem; font-weight: 600; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.p-nuevo { background: var(--warn-soft); color: var(--warn); }
+.p-confirmado { background: var(--info-soft); color: var(--info); }
+.p-en_ruta { background: var(--accent-soft); color: var(--ink); }
+.p-en_ruta::before { background: var(--accent); }
+.p-entregado { background: var(--ok-soft); color: var(--ok); }
+.p-cancelado { background: var(--bad-soft); color: var(--bad); }
+.p-pagado { background: var(--ok-soft); color: var(--ok); }
+.p-pend { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+
+/* Vendor */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 22px; }
+.kpi { padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.kpi span { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.kpi b { font-family: var(--font-display); font-variation-settings: "wdth" 110; font-size: 1.8rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.kpi.alert b { color: var(--warn); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; cursor: pointer; font-size: .85rem; font-weight: 600; color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th { text-align: left; font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td small { display: block; font-size: .8rem; }
+td.num, th.num { text-align: right; }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.acts select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; background: var(--surface); font-size: .85rem; }
+tr.is-new td:first-child { box-shadow: inset 4px 0 0 var(--warn); }
+.price-in { width: 110px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--surface); text-align: right; font-variant-numeric: tabular-nums; }
+.sw { width: 34px; height: 34px; border-radius: 6px; }
+.toggle { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; font-size: .88rem; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--ok); }
+
+.agenda { display: grid; grid-template-columns: 90px repeat(7, minmax(130px, 1fr)); min-width: 1000px; }
+.agenda > div { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.agenda > div:nth-child(8n) { border-right: 0; }
+.ag-h { background: var(--surface-2); font-weight: 700; font-size: .85rem; }
+.ag-h.today { background: var(--accent-soft); }
+.ag-h small { font-weight: 400; }
+.ag-b { font-size: .78rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; background: var(--surface-2); }
+.ag-cell { min-height: 110px; }
+.slot { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: .8rem; background: var(--surface); display: flex; flex-direction: column; gap: 2px; }
+.slot b { font-size: .82rem; }
+.slot .pill { font-size: .7rem; align-self: flex-start; }
+.over { font-size: .74rem; color: var(--bad); font-weight: 600; }
+.legend { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: .85rem; color: var(--muted); padding: 12px 4px; }
+.legend span { display: inline-flex; gap: 8px; align-items: center; }
+.ag-day { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.ag-day.today { border-color: var(--accent); }
+.ag-day-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ag-day-h b { text-transform: capitalize; }
+.ag-day-h b small { text-transform: none; font-weight: 400; }
+
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 10px; font-weight: 600; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
+
+@media (max-width: 960px) {
+  .shop { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "side" "form"; }
+  .cart { position: static; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .calc-row, .form-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .calc-row .f:last-child { grid-column: 1 / -1; }
+  .form-grid > * { grid-column: 1 / -1; }
+  .brand small { display: none; }
+  .seg button { padding: 7px 12px; }
+}
+/* Celular: catálogo en filas compactas, barra de total fija abajo y tablas convertidas en tarjetas */
+@media (max-width: 720px) {
+  .top-in { padding-block: 8px; gap: 10px; flex-wrap: nowrap; }
+  .brand { gap: 8px; }
+  .brand svg { width: 30px; height: 26px; }
+  .brand b { font-size: .95rem; white-space: nowrap; font-variation-settings: "wdth" 100; }
+  .seg button { padding: 7px 11px; font-size: .88rem; }
+  .demo { font-size: .76rem; padding-block: 8px; line-height: 1.35; }
+  .tabs { margin-bottom: 14px; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar, .chips::-webkit-scrollbar { display: none; }
+  h2 { font-size: 1.2rem; }
+  .shop { gap: 18px; }
+  .col { gap: 18px; }
+  .sec-head { margin-bottom: 10px; }
+  .grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .mat { flex-direction: row; }
+  .mat .grain { width: 72px; height: auto; flex: none; }
+  .mat-b { padding: 10px 12px; gap: 1px; min-width: 0; }
+  .mat-b p { font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mat-f { margin-top: 4px; }
+  .price b { font-size: 1.05rem; }
+  .step button { width: 40px; height: 40px; }
+  .step span { min-width: 54px; }
+  .mat-f .btn.sm { padding: 10px 16px; font-size: .9rem; }
+  .f input, .f select, .f textarea, .acts select, .price-in { font-size: 16px; }
+  .f input, .f select, .f textarea { padding: 11px 12px; }
+  .calc, .entrega, .cart, .order { padding: 16px; }
+  .calc-out b { font-size: 1.3rem; }
+  .calc-out .btn { width: 100%; padding: 12px; }
+  .x { padding: 8px 10px; }
+  main.has-bar { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+  .mbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(0,0,0,.10);
+    padding-top: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .mbar small { display: block; font-size: .78rem; color: var(--muted); }
+  .mbar b { font-family: var(--font-display); font-size: 1.25rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .mbar .btn { padding: 12px 20px; text-decoration: none; }
+  .track div { font-size: .72rem; }
+
+  .kpis { gap: 8px; margin-bottom: 14px; }
+  .kpi { padding: 10px 12px; }
+  .kpi span { font-size: .7rem; }
+  .kpi b { font-size: 1.3rem; }
+  .kpi small { font-size: .74rem; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .chip { white-space: nowrap; padding: 8px 13px; }
+  .m-only { display: inline-flex; }
+  .d-only { display: none !important; }
+  .stack { background: transparent; border: 0; overflow: visible; }
+  .stack table, .stack tbody { display: block; }
+  .stack thead { display: none; }
+  .stack tr { display: flex; flex-direction: column; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; margin-bottom: 10px; }
+  .stack tr.is-new { border-color: var(--warn); }
+  .stack tr.is-new td:first-child { box-shadow: none; }
+  .stack td { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; padding: 0; border: 0; }
+  .stack td.num { text-align: left; }
+  .stack td::before { content: attr(data-l); font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; padding-top: 3px; }
+  .stack td:not([data-l]) { display: block; }
+  .stack td:not([data-l])::before { content: none; }
+  .stack td.head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 1rem; }
+  .stack td.head b { font-size: 1.02rem; }
+  .stack .acts { padding-top: 4px; }
+  .stack .acts .btn, .stack .acts select { flex: 1 1 auto; padding: 10px 12px; font-size: .92rem; }
+  .stack .acts select { flex-basis: 100%; }
+  .stack .price-in { width: 100%; max-width: 160px; text-align: left; }
+  .ag-grid { display: none; }
+  .ag-list { display: flex; flex-direction: column; gap: 10px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .btn, .chip, .seg button { transition: background-color .15s, filter .15s; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap top-in">
+    <div class="brand">
+      <svg width="40" height="34" viewBox="0 0 40 34" aria-hidden="true">
+        <path d="M2 32 L17 6 Q20 1 23 6 L38 32 Z" fill="var(--accent)"/>
+        <circle cx="14" cy="24" r="2" fill="var(--head-bg)"/><circle cx="21" cy="17" r="1.6" fill="var(--head-bg)"/>
+        <circle cx="25" cy="26" r="2.3" fill="var(--head-bg)"/><circle cx="19" cy="28" r="1.3" fill="var(--head-bg)"/>
+        <circle cx="29" cy="30" r="1.2" fill="var(--head-bg)"/>
+      </svg>
+      <div><b>Patio de Áridos</b><small>Venta y despacho en camión tolva</small></div>
+    </div>
+    <div class="seg" id="roleSeg"></div>
+  </div>
+</header>
+<div class="wrap demo">Precios, clientes y pedidos son de ejemplo. Lo que cambies se borra al recargar la página.</div>
+<main class="wrap" id="app"></main>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+const PRODUCTS = [
+  { id: 'arena-gruesa', name: 'Arena gruesa', use: 'Hormigón, radieres y morteros de pega.', price: 24900, stock: true, sw: ['#B79A72', '#8C7351', '#D6C2A0'], g: 'fine' },
+  { id: 'arena-fina', name: 'Arena fina', use: 'Estucos, enlucidos y terminaciones.', price: 26900, stock: true, sw: ['#CDB892', '#A8916A', '#E3D6BC'], g: 'fine' },
+  { id: 'gravilla', name: 'Gravilla ¾"', use: 'Hormigón para losas, pilares y fundaciones.', price: 27900, stock: true, sw: ['#8E8B85', '#5F5C57', '#B9B5AE'], g: '' },
+  { id: 'ripio', name: 'Ripio', use: 'Rellenos, drenajes y caminos interiores.', price: 21900, stock: true, sw: ['#9A8F80', '#6B6256', '#C4B9A8'], g: '' },
+  { id: 'maicillo', name: 'Maicillo', use: 'Senderos de jardín, patios y canchas.', price: 23900, stock: true, sw: ['#C9A36B', '#A07A45', '#E2C799'], g: 'fine' },
+  { id: 'base', name: 'Base estabilizada', use: 'Sub-base compactada bajo radieres y pavimentos.', price: 19900, stock: true, sw: ['#8A7F70', '#5E5548', '#B3A897'], g: '' },
+  { id: 'chancado', name: 'Chancado 1½"', use: 'Drenes, fundaciones y estacionamientos.', price: 25900, stock: true, sw: ['#7D7F80', '#505354', '#A9ABAB'], g: 'coarse' },
+  { id: 'tierra', name: 'Tierra de hoja', use: 'Jardines, pasto en rollo y maceteros.', price: 29900, stock: true, sw: ['#4A3A2C', '#2E241B', '#6D5743'], g: 'fine' },
+  { id: 'bolon', name: 'Bolón desplazador', use: 'Hormigón ciclópeo y muros de contención.', price: 31900, stock: false, sw: ['#9C9890', '#6E6A63', '#C8C4BC'], g: 'coarse' },
+];
+const ZONES = [
+  { id: 'A', name: 'Zona 1 · hasta 10 km', rate: 25000 },
+  { id: 'B', name: 'Zona 2 · 10 a 20 km', rate: 40000 },
+  { id: 'C', name: 'Zona 3 · 20 a 35 km', rate: 60000 },
+];
+const TRUCKS = [
+  { id: 'T1', name: 'Tolva 7 m³', plate: 'HJKT-42', driver: 'Pedro Soto', cap: 7 },
+  { id: 'T2', name: 'Tolva 14 m³', plate: 'GRZP-18', driver: 'Luis Araya', cap: 14 },
+  { id: 'T3', name: 'Tolva 14 m³', plate: 'FXLW-63', driver: 'Marcos Rojas', cap: 14 },
+];
+const BLOCKS = { am: 'Mañana · 8:00 a 13:00', pm: 'Tarde · 14:00 a 19:00' };
+const ACCESS = {
+  entra: 'Entra camión tolva al terreno',
+  calle: 'Descarga en la calle, frente a la dirección',
+  dificil: 'Acceso difícil, prefiero que me llamen',
+};
+const PAY = { transferencia: 'Transferencia', contra: 'Pago al recibir' };
+const STATUS = { nuevo: 'Por confirmar', confirmado: 'Confirmado', en_ruta: 'En ruta', entregado: 'Entregado', cancelado: 'Rechazado' };
+const STEPS = ['nuevo', 'confirmado', 'en_ruta', 'entregado'];
+
+const clp = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+const m3 = n => n.toLocaleString('es-CL', { maximumFractionDigits: 1 }) + ' m³';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const prod = id => S.products.find(p => p.id === id);
+const zone = id => ZONES.find(z => z.id === id);
+const truck = id => TRUCKS.find(t => t.id === id);
+function isoDay(off) { const d = new Date(); d.setDate(d.getDate() + off); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function fmtDay(iso, opts = { weekday: 'short', day: 'numeric', month: 'short' }) { return new Date(iso + 'T12:00').toLocaleDateString('es-CL', opts); }
+const sw = p => `--c1:${p.sw[0]};--c2:${p.sw[1]};--c3:${p.sw[2]}`;
+
+function quote(items, zoneId) {
+  let mat = 0, vol = 0; const lines = [];
+  for (const [id, q] of Object.entries(items)) {
+    if (!q) continue;
+    const p = prod(id); mat += p.price * q; vol += q; lines.push({ p, q, sub: p.price * q });
+  }
+  const z = zone(zoneId); let trips = 0, cap = 0, flete = 0;
+  if (vol > 0) {
+    if (vol <= 7) { trips = 1; cap = 7; flete = z.rate; }
+    else { cap = 14; trips = Math.ceil(vol / 14); flete = Math.round(trips * z.rate * 1.5); }
+  }
+  const neto = mat + flete, iva = Math.round(neto * 0.19);
+  return { lines, mat, vol, trips, cap, flete, neto, iva, total: neto + iva };
+}
+
+function makeOrder(o) {
+  const q = quote(o.items, o.zone);
+  return { paid: false, truck: null, mine: false, access: 'entra', contact: '', notes: '', ...o, q };
+}
+
+const S = {
+  role: 'cliente', ctab: 'comprar', vtab: 'pedidos', vfilter: 'todos',
+  products: PRODUCTS, cart: { gravilla: 2, 'arena-gruesa': 1.5 }, zone: 'A', nextId: 1007,
+  calc: { l: 6, a: 4, e: 10, p: 'base' },
+  form: { name: 'María José Pérez', phone: '+56 9 8123 4567', address: 'Los Aromos 2240, Parcela 14', date: isoDay(2), block: 'am', access: 'entra', contact: '', pay: 'transferencia', notes: '' },
+};
+S.orders = [
+  makeOrder({ id: 1001, name: 'Constructora Los Aromos', phone: '+56 9 7654 1122', address: 'Camino Lo Orozco 1450', zone: 'B', items: { gravilla: 6, 'arena-gruesa': 4 }, date: isoDay(1), block: 'am', status: 'confirmado', truck: 'T2', pay: 'transferencia', paid: true, created: isoDay(-1) }),
+  makeOrder({ id: 1002, name: 'María José Pérez', phone: '+56 9 8123 4567', address: 'Los Aromos 2240, Parcela 14', zone: 'A', items: { maicillo: 3 }, date: isoDay(1), block: 'pm', status: 'nuevo', pay: 'contra', mine: true, created: isoDay(0), access: 'calle' }),
+  makeOrder({ id: 1003, name: 'Jorge Muñoz', phone: '+56 9 9001 3344', address: 'Pasaje Las Dalias 87', zone: 'A', items: { 'arena-fina': 2, gravilla: 2 }, date: isoDay(0), block: 'am', status: 'en_ruta', truck: 'T1', pay: 'contra', created: isoDay(-2) }),
+  makeOrder({ id: 1004, name: 'Ferretería El Molino', phone: '+56 2 2345 6789', address: 'Av. Central 3301', zone: 'C', items: { ripio: 7 }, date: isoDay(0), block: 'pm', status: 'confirmado', truck: 'T1', pay: 'transferencia', paid: true, created: isoDay(-3) }),
+  makeOrder({ id: 1005, name: 'Ana Contreras', phone: '+56 9 6677 8899', address: 'El Roble 512', zone: 'A', items: { tierra: 4 }, date: isoDay(-2), block: 'am', status: 'entregado', truck: 'T1', pay: 'transferencia', paid: true, created: isoDay(-5) }),
+  makeOrder({ id: 1006, name: 'Constructora Los Aromos', phone: '+56 9 7654 1122', address: 'Loteo Santa Elena, Lote 9', zone: 'B', items: { base: 14 }, date: isoDay(3), block: 'am', status: 'nuevo', pay: 'transferencia', created: isoDay(0), access: 'entra' }),
+];
+
+/* ---------- Render ---------- */
+const app = document.getElementById('app');
+function render() {
+  const nuevos = S.orders.filter(o => o.status === 'nuevo').length;
+  document.getElementById('roleSeg').innerHTML = `
+    <button data-act="role" data-v="cliente" aria-pressed="${S.role === 'cliente'}">Cliente</button>
+    <button data-act="role" data-v="vendedor" aria-pressed="${S.role === 'vendedor'}">Vendedor${nuevos ? ` <span class="badge">${nuevos}</span>` : ''}</button>`;
+  app.innerHTML = S.role === 'cliente' ? clientView() : vendorView();
+  app.classList.toggle('has-bar', !!app.querySelector('.mbar'));
+  updateCalc();
+}
+
+function clientView() {
+  const mine = S.orders.filter(o => o.mine);
+  return `
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-act="ctab" data-v="comprar" aria-selected="${S.ctab === 'comprar'}">Comprar</button>
+    <button role="tab" data-act="ctab" data-v="pedidos" aria-selected="${S.ctab === 'pedidos'}">Mis pedidos <span class="count">${mine.length}</span></button>
+  </nav>
+  ${S.ctab === 'comprar' ? shopView() : myOrdersView(mine)}`;
+}
+
+function shopView() {
+  const q = quote(S.cart, S.zone);
+  return `
+  <div class="shop">
+    <div class="col">
+      <section>
+        <div class="sec-head"><h2>Materiales</h2><p class="muted">Precio por metro cúbico, sin IVA. Mínimo 1 m³ por pedido.</p></div>
+        <div class="grid">${S.products.map(card).join('')}</div>
+      </section>
+      ${calcView()}
+    </div>
+    ${cartView(q)}
+    ${deliveryForm(q)}
+  </div>
+  ${q.lines.length ? `<div class="mbar"><div><small>${m3(q.vol)} · ${q.trips} ${q.trips === 1 ? 'viaje' : 'viajes'} · con IVA</small><b>${clp.format(q.total)}</b></div><a class="btn pri" href="#pedido">Ver pedido</a></div>` : ''}`;
+}
+
+function card(p) {
+  const qty = S.cart[p.id] || 0;
+  const ctl = !p.stock ? '<span class="pill p-cancelado">Sin stock</span>'
+    : qty ? `<div class="step"><button data-act="qty" data-id="${p.id}" data-d="-0.5" aria-label="Quitar medio metro cúbico">−</button><span>${m3(qty)}</span><button data-act="qty" data-id="${p.id}" data-d="0.5" aria-label="Agregar medio metro cúbico">+</button></div>`
+    : `<button class="btn sm" data-act="qty" data-id="${p.id}" data-d="1">Agregar</button>`;
+  return `<article class="card mat${p.stock ? '' : ' off'}">
+    <div class="grain ${p.g}" style="${sw(p)}" aria-hidden="true"></div>
+    <div class="mat-b"><h3>${esc(p.name)}</h3><p>${esc(p.use)}</p>
+      <div class="mat-f"><div class="price"><b>${clp.format(p.price)}</b><span> /m³</span></div>${ctl}</div>
+    </div></article>`;
+}
+
+function calcView() {
+  const c = S.calc;
+  return `<section class="card calc" aria-labelledby="calcT">
+    <div class="sec-head" style="margin:0"><h2 id="calcT">¿Cuánto material necesito?</h2>
+    <p class="muted">Ingresa las medidas de la superficie. Sumamos un 10% por compactación y pérdida.</p></div>
+    <div class="calc-row">
+      <label class="f">Largo (m)<input id="c-l" type="number" min="0" step="0.1" inputmode="decimal" value="${c.l}" data-calc="l"></label>
+      <label class="f">Ancho (m)<input id="c-a" type="number" min="0" step="0.1" inputmode="decimal" value="${c.a}" data-calc="a"></label>
+      <label class="f">Espesor (cm)<input id="c-e" type="number" min="0" step="1" inputmode="numeric" value="${c.e}" data-calc="e"></label>
+      <label class="f">Material<select id="c-p" data-calc="p">${S.products.filter(p => p.stock).map(p => `<option value="${p.id}"${p.id === c.p ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+    </div>
+    <div class="calc-out"><div><small>Necesitas aproximadamente</small><br><b id="calcOut">–</b> <span class="muted" id="calcSub"></span></div>
+      <button class="btn dark" data-act="calcAdd" id="calcBtn">Agregar al pedido</button></div>
+  </section>`;
+}
+function calcValue() {
+  const { l, a, e } = S.calc; const raw = (+l || 0) * (+a || 0) * ((+e || 0) / 100) * 1.1;
+  return raw > 0 ? Math.max(1, Math.ceil(raw * 2) / 2) : 0;
+}
+function updateCalc() {
+  const out = document.getElementById('calcOut'); if (!out) return;
+  const v = calcValue(), p = prod(S.calc.p);
+  out.textContent = v ? m3(v) : '–';
+  document.getElementById('calcSub').textContent = v && p ? `de ${p.name} · ${clp.format(v * p.price)} neto` : '';
+  document.getElementById('calcBtn').disabled = !v;
+}
+
+function cartView(q) {
+  const empty = !q.lines.length;
+  const loads = [];
+  for (let i = 0; i < q.trips; i++) { const fill = Math.min(1, Math.max(0, (q.vol - i * q.cap) / q.cap)); loads.push(`<div class="load"><i style="width:${Math.round(fill * 100)}%"></i></div>`); }
+  return `<aside class="card cart" id="pedido" aria-labelledby="cartT">
+    <h2 id="cartT">Tu pedido</h2>
+    ${empty ? '<p class="cart-empty">Aún no agregas materiales. Elige uno del catálogo o calcula cuánto necesitas.</p>' : `
+    <div class="lines">${q.lines.map(l => `<div class="line"><span class="dot" style="${sw(l.p)}"></span><span>${esc(l.p.name)} <small>· ${m3(l.q)}</small></span><span class="num">${clp.format(l.sub)}</span><button class="x" data-act="rm" data-id="${l.p.id}" aria-label="Quitar ${esc(l.p.name)}">×</button></div>`).join('')}</div>`}
+    <label class="f">Zona de despacho<select id="zoneSel" data-act-change="zone">${ZONES.map(z => `<option value="${z.id}"${z.id === S.zone ? ' selected' : ''}>${z.name} · ${clp.format(z.rate)}</option>`).join('')}</select></label>
+    ${empty ? '' : `
+    <div class="truck">
+      <div class="truck-top">${truckSvg()}<div><b>${q.trips} ${q.trips === 1 ? 'viaje' : 'viajes'} en camión tolva ${q.cap} m³</b><br><small>${m3(q.vol)} en total</small></div></div>
+      <div class="loads">${loads.join('')}</div>
+    </div>
+    ${q.vol < 1 ? '<p class="warnbox">El pedido mínimo es de 1 m³.</p>' : ''}
+    ${q.vol > 7 && q.vol < 10 ? '<p class="warnbox">Sobre 7 m³ despachamos en camión de 14 m³. Puedes sumar material sin pagar más flete.</p>' : ''}
+    <div class="tot">
+      <div><span>Materiales</span><span>${clp.format(q.mat)}</span></div>
+      <div><span>Flete</span><span>${clp.format(q.flete)}</span></div>
+      <div><span>IVA 19%</span><span>${clp.format(q.iva)}</span></div>
+      <div class="big"><span>Total</span><span>${clp.format(q.total)}</span></div>
+    </div>
+    <a class="btn pri block" href="#entrega" style="text-align:center;text-decoration:none">Coordinar entrega</a>`}
+  </aside>`;
+}
+const truckSvg = () => `<svg width="38" height="24" viewBox="0 0 38 24" aria-hidden="true"><path d="M2 4 L22 4 L24 16 L2 16 Z" fill="var(--accent)"/><path d="M24 8 L31 8 L35 13 L35 18 L24 18 Z" fill="var(--ink)"/><rect x="2" y="16" width="33" height="3" fill="var(--ink)"/><circle cx="8" cy="20" r="3" fill="var(--ink)" stroke="var(--surface-2)" stroke-width="1.5"/><circle cx="29" cy="20" r="3" fill="var(--ink)" stroke="var(--surface-2)" stroke-width="1.5"/></svg>`;
+
+function deliveryForm(q) {
+  const f = S.form;
+  const radio = (name, val, title, sub) => `<label class="choice"><input type="radio" name="${name}" value="${val}" data-form="${name}"${f[name] === val ? ' checked' : ''}><span><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span></label>`;
+  return `<form class="card entrega" id="entrega" novalidate>
+    <div class="sec-head" style="margin:0"><h2>Datos de entrega</h2><p class="muted">Te confirmamos el despacho por WhatsApp antes de salir.</p></div>
+    <div class="form-grid">
+      <label class="f">Nombre o empresa<input id="f-name" required data-form="name" value="${esc(f.name)}" autocomplete="name"></label>
+      <label class="f">Teléfono<input id="f-phone" required type="tel" data-form="phone" value="${esc(f.phone)}" autocomplete="tel"></label>
+      <label class="f wide">Dirección de entrega<input id="f-address" required data-form="address" value="${esc(f.address)}" autocomplete="street-address"></label>
+      <label class="f">Fecha de entrega<input id="f-date" type="date" required min="${isoDay(1)}" data-form="date" value="${f.date}"></label>
+      <label class="f">Acceso para el camión<select id="f-access" data-form="access">${Object.entries(ACCESS).map(([k, v]) => `<option value="${k}"${f.access === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+      <fieldset class="wide"><legend>Horario</legend><div class="choices">${radio('block', 'am', 'Mañana', '8:00 a 13:00')}${radio('block', 'pm', 'Tarde', '14:00 a 19:00')}</div></fieldset>
+      <fieldset class="wide"><legend>Forma de pago</legend><div class="choices">${radio('pay', 'transferencia', 'Transferencia', 'Te enviamos los datos al confirmar')}${radio('pay', 'contra', 'Pago al recibir', 'Efectivo o transferencia al chofer')}</div></fieldset>
+      <label class="f">Contacto en terreno (opcional)<input id="f-contact" data-form="contact" value="${esc(f.contact)}" placeholder="Nombre y teléfono"></label>
+      <label class="f">Indicaciones (opcional)<input id="f-notes" data-form="notes" value="${esc(f.notes)}" placeholder="Ej.: portón verde, descargar junto a la bodega"></label>
+    </div>
+    <button class="btn pri block" type="submit"${q.vol >= 1 ? '' : ' disabled'}>${q.vol >= 1 ? `Enviar pedido · ${clp.format(q.total)}` : 'Agrega al menos 1 m³ para enviar'}</button>
+  </form>`;
+}
+
+function myOrdersView(mine) {
+  if (!mine.length) return '<p class="cart-empty">Todavía no tienes pedidos.</p>';
+  return `<div class="orders">${[...mine].sort((a, b) => b.id - a.id).map(o => {
+    const idx = STEPS.indexOf(o.status);
+    const t = truck(o.truck);
+    return `<article class="card order">
+      <div class="order-h"><div><h3>Pedido N° ${o.id}</h3><small>Hecho el ${fmtDay(o.created, { day: 'numeric', month: 'long' })}</small></div><span class="pill p-${o.status}">${STATUS[o.status]}</span></div>
+      ${o.status === 'cancelado' ? '<p class="warnbox">El vendedor no pudo tomar este pedido. Te llamaremos para ofrecerte otra fecha.</p>'
+        : `<div class="track">${['Recibido', 'Confirmado', 'En ruta', 'Entregado'].map((s, i) => `<div class="${i <= idx ? 'done' : ''}">${s}</div>`).join('')}</div>`}
+      <div class="kv">
+        <div><span>Entrega</span>${fmtDay(o.date, { weekday: 'long', day: 'numeric', month: 'long' })}<br><small>${BLOCKS[o.block]}</small></div>
+        <div><span>Dirección</span>${esc(o.address)}<br><small>${zone(o.zone).name}</small></div>
+        <div><span>Materiales</span>${o.q.lines.map(l => `${esc(l.p.name)} · ${m3(l.q)}`).join('<br>')}</div>
+        <div><span>Total</span><b>${clp.format(o.q.total)}</b><br><small>${PAY[o.pay]} · ${o.paid ? 'pagado' : 'pago pendiente'}</small></div>
+        ${t && o.status !== 'entregado' ? `<div><span>Camión</span>${t.name} · ${t.plate}<br><small>Chofer: ${t.driver}</small></div>` : ''}
+      </div>
+    </article>`;
+  }).join('')}</div>`;
+}
+
+/* ---------- Vendor ---------- */
+function vendorView() {
+  const today = isoDay(0), week = isoDay(6), month = today.slice(0, 7);
+  const live = S.orders.filter(o => o.status !== 'cancelado');
+  const nuevos = S.orders.filter(o => o.status === 'nuevo').length;
+  const hoy = live.filter(o => o.date === today).length;
+  const vol7 = live.filter(o => o.date >= today && o.date <= week).reduce((s, o) => s + o.q.vol, 0);
+  const ventas = live.filter(o => o.created.slice(0, 7) === month).reduce((s, o) => s + o.q.total, 0);
+  const tab = (v, label, n) => `<button role="tab" data-act="vtab" data-v="${v}" aria-selected="${S.vtab === v}">${label}${n != null ? ` <span class="count">${n}</span>` : ''}</button>`;
+  return `
+  <div class="kpis">
+    <div class="card kpi${nuevos ? ' alert' : ''}"><span>Por confirmar</span><b>${nuevos}</b><small>pedidos nuevos</small></div>
+    <div class="card kpi"><span>Despachos hoy</span><b>${hoy}</b><small>${fmtDay(today, { weekday: 'long', day: 'numeric', month: 'long' })}</small></div>
+    <div class="card kpi"><span>Próximos 7 días</span><b>${m3(vol7)}</b><small>por despachar</small></div>
+    <div class="card kpi"><span>Ventas del mes</span><b>${clp.format(ventas)}</b><small>con IVA, sin rechazados</small></div>
+  </div>
+  <nav class="tabs" role="tablist">${tab('pedidos', 'Pedidos', S.orders.length)}${tab('agenda', 'Agenda de despachos')}${tab('productos', 'Productos y precios')}${tab('clientes', 'Clientes')}</nav>
+  ${{ pedidos: ordersTable, agenda: agendaView, productos: productsView, clientes: clientsView }[S.vtab]()}`;
+}
+
+function ordersTable() {
+  const filters = { todos: 'Todos', nuevo: 'Por confirmar', confirmado: 'Confirmados', en_ruta: 'En ruta', entregado: 'Entregados' };
+  const rows = S.orders.filter(o => S.vfilter === 'todos' || o.status === S.vfilter).sort((a, b) => (a.date + a.block).localeCompare(b.date + b.block));
+  return `<div class="chips">${Object.entries(filters).map(([k, v]) => `<button class="chip" data-act="vfilter" data-v="${k}" aria-pressed="${S.vfilter === k}">${v}</button>`).join('')}</div>
+  <div class="card tbl-wrap stack"><table>
+    <thead><tr><th>N°</th><th>Cliente</th><th>Entrega</th><th>Materiales</th><th class="num">Total</th><th>Pago</th><th>Estado</th><th>Acciones</th></tr></thead>
+    <tbody>${rows.length ? rows.map(orderRow).join('') : '<tr><td colspan="8" class="muted">No hay pedidos con este filtro.</td></tr>'}</tbody>
+  </table></div>`;
+}
+function orderRow(o) {
+  let acts = '';
+  if (o.status === 'nuevo') acts = `<button class="btn sm pri" data-act="confirm" data-id="${o.id}">Confirmar</button><button class="btn sm ghost" data-act="reject" data-id="${o.id}">Rechazar</button>`;
+  else if (o.status === 'confirmado') acts = `<select id="tr-${o.id}" data-act-change="truck" data-id="${o.id}" aria-label="Camión para el pedido ${o.id}"><option value="">Asignar camión…</option>${TRUCKS.map(t => `<option value="${t.id}"${o.truck === t.id ? ' selected' : ''}${t.cap < o.q.cap ? ' disabled' : ''}>${t.name} · ${t.driver}</option>`).join('')}</select><button class="btn sm dark" data-act="dispatch" data-id="${o.id}"${o.truck ? '' : ' disabled'}>Despachar</button>`;
+  else if (o.status === 'en_ruta') acts = `<button class="btn sm pri" data-act="deliver" data-id="${o.id}">Marcar entregado</button>`;
+  if (!o.paid && o.status !== 'cancelado') acts += `<button class="btn sm ghost" data-act="paid" data-id="${o.id}">Registrar pago</button>`;
+  const t = truck(o.truck);
+  return `<tr class="${o.status === 'nuevo' ? 'is-new' : ''}">
+    <td class="mono head"><span>#${o.id}</span><span class="pill p-${o.status} m-only">${STATUS[o.status]}</span></td>
+    <td data-l="Cliente"><span><b>${esc(o.name)}</b><small>${esc(o.phone)}</small><small>${esc(o.address)} · ${zone(o.zone).name.split(' · ')[0]}</small></span></td>
+    <td data-l="Entrega"><span>${fmtDay(o.date)}<small>${o.block === 'am' ? 'Mañana' : 'Tarde'}</small><small>${ACCESS[o.access].split(',')[0]}</small></span></td>
+    <td data-l="Material"><span>${o.q.lines.map(l => `${esc(l.p.name)} ${m3(l.q)}`).join('<br>')}<small>${o.q.trips} × tolva ${o.q.cap} m³${t ? ' · ' + t.plate : ''}</small></span></td>
+    <td class="num" data-l="Total"><span><b>${clp.format(o.q.total)}</b><small>flete ${clp.format(o.q.flete)}</small></span></td>
+    <td data-l="Pago"><span><span class="pill ${o.paid ? 'p-pagado' : 'p-pend'}">${o.paid ? 'Pagado' : 'Pendiente'}</span><small>${PAY[o.pay]}</small></span></td>
+    <td class="d-only"><span class="pill p-${o.status}">${STATUS[o.status]}</span></td>
+    <td${acts ? '' : ' class="d-only"'}><div class="acts">${acts || '<span class="muted">—</span>'}</div></td>
+  </tr>`;
+}
+
+function agendaView() {
+  const days = Array.from({ length: 7 }, (_, i) => isoDay(i));
+  const live = S.orders.filter(o => o.status !== 'cancelado');
+  let html = '<div class="ag-h"></div>' + days.map((d, i) => {
+    const vol = live.filter(o => o.date === d).reduce((s, o) => s + o.q.vol, 0);
+    return `<div class="ag-h${i === 0 ? ' today' : ''}">${i === 0 ? 'Hoy' : fmtDay(d, { weekday: 'long' })}<small>${fmtDay(d, { day: 'numeric', month: 'short' })} · ${m3(vol)}</small></div>`;
+  }).join('');
+  for (const b of ['am', 'pm']) {
+    html += `<div class="ag-b">${b === 'am' ? 'Mañana' : 'Tarde'}</div>`;
+    html += days.map(d => {
+      const list = live.filter(o => o.date === d && o.block === b);
+      const trips = list.reduce((s, o) => s + o.q.trips, 0);
+      return `<div class="ag-cell">${list.map(o => `<div class="slot"><b>#${o.id} · ${esc(o.name)}</b><span>${m3(o.q.vol)} · ${truck(o.truck) ? truck(o.truck).plate : 'sin camión'}</span><span class="pill p-${o.status}">${STATUS[o.status]}</span></div>`).join('')}
+        ${trips > TRUCKS.length ? `<span class="over">${trips} viajes y solo hay ${TRUCKS.length} camiones</span>` : ''}</div>`;
+    }).join('');
+  }
+  const byDay = days.map((d, i) => {
+    const list = live.filter(o => o.date === d).sort((a, b) => a.block.localeCompare(b.block));
+    const vol = list.reduce((s, o) => s + o.q.vol, 0);
+    return `<section class="card ag-day${i === 0 ? ' today' : ''}">
+      <div class="ag-day-h"><b>${i === 0 ? 'Hoy' : fmtDay(d, { weekday: 'long' })} <small>${fmtDay(d, { day: 'numeric', month: 'short' })}</small></b><small>${list.length ? m3(vol) : ''}</small></div>
+      ${list.length ? list.map(o => `<div class="slot"><b>${o.block === 'am' ? 'Mañana' : 'Tarde'} · #${o.id} · ${esc(o.name)}</b><span>${o.q.lines.map(l => `${esc(l.p.name)} ${m3(l.q)}`).join(', ')} · ${truck(o.truck) ? truck(o.truck).plate : 'sin camión'}</span><span class="pill p-${o.status}">${STATUS[o.status]}</span></div>`).join('') : '<small>Sin despachos</small>'}
+    </section>`;
+  }).join('');
+  return `<div class="card ag-grid"><div class="tbl-wrap"><div class="agenda">${html}</div></div></div>
+    <div class="ag-list">${byDay}</div>
+    <div class="legend">${TRUCKS.map(t => `<span>${truckSvg()} ${t.name} · ${t.plate} · ${t.driver}</span>`).join('')}</div>`;
+}
+
+function productsView() {
+  return `<p class="muted" style="margin-bottom:12px">Los cambios de precio y stock se ven al instante en la vista del cliente.</p>
+  <div class="card tbl-wrap stack"><table>
+    <thead><tr><th></th><th>Material</th><th>Uso</th><th class="num">Precio neto /m³</th><th>Stock</th></tr></thead>
+    <tbody>${S.products.map(p => `<tr>
+      <td class="d-only"><div class="grain sw ${p.g}" style="${sw(p)}"></div></td>
+      <td class="head"><b>${esc(p.name)}</b><span class="grain sw m-only ${p.g}" style="${sw(p)};width:28px;height:28px"></span></td><td class="muted d-only">${esc(p.use)}</td>
+      <td class="num" data-l="Precio /m³"><input class="price-in" id="pr-${p.id}" type="number" min="0" step="100" value="${p.price}" data-act-change="price" data-id="${p.id}" aria-label="Precio de ${esc(p.name)}"></td>
+      <td data-l="Stock"><label class="toggle"><input type="checkbox" id="st-${p.id}" data-act-change="stock" data-id="${p.id}"${p.stock ? ' checked' : ''}> ${p.stock ? 'Disponible' : 'Sin stock'}</label></td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+function clientsView() {
+  const map = new Map();
+  for (const o of S.orders) {
+    const c = map.get(o.name) || { name: o.name, phone: o.phone, n: 0, vol: 0, total: 0, last: '' };
+    c.n++; if (o.status !== 'cancelado') { c.vol += o.q.vol; c.total += o.q.total; } if (o.date > c.last) c.last = o.date;
+    map.set(o.name, c);
+  }
+  const list = [...map.values()].sort((a, b) => b.total - a.total);
+  return `<div class="card tbl-wrap stack"><table>
+    <thead><tr><th>Cliente</th><th>Teléfono</th><th class="num">Pedidos</th><th class="num">Volumen</th><th class="num">Compras</th><th>Última entrega</th></tr></thead>
+    <tbody>${list.map(c => `<tr><td class="head"><b>${esc(c.name)}</b></td><td class="mono" data-l="Teléfono">${esc(c.phone)}</td><td class="num" data-l="Pedidos">${c.n}</td><td class="num" data-l="Volumen">${m3(c.vol)}</td><td class="num" data-l="Compras"><b>${clp.format(c.total)}</b></td><td data-l="Última entrega">${fmtDay(c.last, { day: 'numeric', month: 'long' })}</td></tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+/* ---------- Events ---------- */
+let toastT;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+const order = id => S.orders.find(o => o.id === +id);
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+  const { act, v, id } = b.dataset;
+  switch (act) {
+    case 'role': S.role = v; window.scrollTo(0, 0); break;
+    case 'ctab': S.ctab = v; break;
+    case 'vtab': S.vtab = v; break;
+    case 'vfilter': S.vfilter = v; break;
+    case 'qty': S.cart[id] = Math.max(0, (S.cart[id] || 0) + +b.dataset.d); if (!S.cart[id]) delete S.cart[id]; break;
+    case 'rm': delete S.cart[id]; break;
+    case 'calcAdd': { const n = calcValue(); S.cart[S.calc.p] = (S.cart[S.calc.p] || 0) + n; toast(`Agregaste ${m3(n)} de ${prod(S.calc.p).name}`); break; }
+    case 'confirm': { const o = order(id); o.status = 'confirmado'; const t = TRUCKS.find(t => t.cap >= o.q.cap); o.truck = t ? t.id : null; toast(`Pedido #${id} confirmado. El cliente ve el cambio en "Mis pedidos".`); break; }
+    case 'reject': order(id).status = 'cancelado'; toast(`Pedido #${id} rechazado`); break;
+    case 'dispatch': order(id).status = 'en_ruta'; toast(`Pedido #${id} salió a ruta`); break;
+    case 'deliver': order(id).status = 'entregado'; toast(`Pedido #${id} entregado`); break;
+    case 'paid': order(id).paid = true; toast(`Pago del pedido #${id} registrado`); break;
+    default: return;
+  }
+  render();
+});
+
+document.addEventListener('change', e => {
+  const el = e.target, k = el.dataset.actChange; if (!k) return;
+  const id = el.dataset.id;
+  if (k === 'zone') S.zone = el.value;
+  if (k === 'truck') order(id).truck = el.value || null;
+  if (k === 'price') { const p = prod(id); p.price = Math.max(0, Math.round(+el.value || 0)); refreshPrices(); toast(`Nuevo precio de ${p.name}: ${clp.format(p.price)} /m³`); }
+  if (k === 'stock') { const p = prod(id); p.stock = el.checked; if (!p.stock) delete S.cart[id]; if (!p.stock && S.calc.p === id) S.calc.p = S.products.find(x => x.stock)?.id; }
+  render();
+});
+// Precios nuevos se aplican a pedidos que aún no se confirman
+function refreshPrices() { for (const o of S.orders) if (o.status === 'nuevo') o.q = quote(o.items, o.zone); }
+
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.dataset.calc) { S.calc[el.dataset.calc] = el.value; updateCalc(); }
+  if (el.dataset.form) S.form[el.dataset.form] = el.value;
+});
+document.addEventListener('change', e => { const el = e.target; if (el.dataset.form) S.form[el.dataset.form] = el.value; if (el.dataset.calc) { S.calc[el.dataset.calc] = el.value; updateCalc(); } });
+
+document.addEventListener('submit', e => {
+  e.preventDefault();
+  const f = S.form, q = quote(S.cart, S.zone);
+  const missing = [['name', 'tu nombre'], ['phone', 'un teléfono'], ['address', 'la dirección'], ['date', 'la fecha']].filter(([k]) => !String(f[k]).trim());
+  if (missing.length) { toast('Falta ' + missing.map(m => m[1]).join(', ')); document.getElementById('f-' + missing[0][0])?.focus(); return; }
+  if (f.date < isoDay(1)) { toast('La entrega debe ser desde mañana en adelante'); document.getElementById('f-date').focus(); return; }
+  if (q.vol < 1) return;
+  const id = S.nextId++;
+  S.orders.push(makeOrder({ id, ...f, zone: S.zone, items: { ...S.cart }, status: 'nuevo', mine: true, created: isoDay(0) }));
+  S.cart = {}; S.ctab = 'pedidos';
+  render(); window.scrollTo(0, 0);
+  toast(`Pedido N° ${id} enviado. Cambia a "Vendedor" para verlo llegar.`);
+});
+
+render();
+</script>
+</body>
+</html>

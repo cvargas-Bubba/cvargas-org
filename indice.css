@@ -1,0 +1,85 @@
+/* Índice de cvargas.org. Misma paleta que el resto del sitio y del
+   cotizador: esto no es una portada, es la puerta de entrada. */
+
+:root {
+  --bg: #14110F;
+  --bg2: #1C1816;
+  --panel: #211C19;
+  --linea: #3A322D;
+  --texto: #F1ECE7;
+  --suave: #A79A90;
+  --tenue: #6E625B;
+  --acento: #C98A3E;
+  --acento-h: #DDA059;
+  --alerta: #D2694F;
+  --ok: #7FA05A;
+  --cond: "Barlow Condensed", system-ui, sans-serif;
+  --sans: "Source Sans 3", system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--texto); font: 400 16px/1.6 var(--sans); -webkit-text-size-adjust: 100%; }
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+
+/* ---------- cabecera ---------- */
+.cab { border-bottom: 1px solid var(--linea); }
+.cab-in { max-width: 1000px; margin: 0 auto; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.sitio { font: 600 20px/1 var(--cond); letter-spacing: 2px; text-transform: uppercase; }
+.sitio span { color: var(--acento); }
+.sesion { display: flex; align-items: center; gap: 12px; }
+.sesion-q { font-size: 13px; color: var(--suave); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; font: 600 14px/1 var(--sans); padding: 10px 16px; border-radius: 99px; border: 1px solid var(--linea); background: none; color: var(--texto); }
+.btn-linea:hover { border-color: var(--acento); color: var(--acento); }
+.btn-lleno { background: var(--acento); border-color: var(--acento); color: #1A1512; }
+.btn-lleno:hover { background: var(--acento-h); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+/* ---------- tarjetas ---------- */
+.hoja { max-width: 1000px; margin: 0 auto; padding: 40px 24px 64px; }
+.tarjetas { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.tarjeta a { display: flex; flex-direction: column; gap: 10px; height: 100%; background: var(--panel); border: 1px solid var(--linea); border-radius: 14px; padding: 20px 22px; transition: border-color .15s, transform .15s; }
+.tarjeta a:hover { border-color: var(--acento); transform: translateY(-2px); }
+.t-cab { display: flex; flex-direction: column; gap: 2px; }
+.t-n { font: 600 22px/1.1 var(--cond); letter-spacing: .5px; }
+.t-b { font-size: 12px; color: var(--acento); text-transform: uppercase; letter-spacing: 1.4px; }
+.t-t { color: var(--suave); font-size: 14.5px; }
+.t-pie { margin-top: auto; font: 600 12.5px/1 var(--sans); color: var(--acento); }
+
+/* cerrada: se ve que está, pero pide entrar */
+.tarjeta.cerrada a { border-style: dashed; }
+.tarjeta.cerrada .t-n, .tarjeta.cerrada .t-t { color: var(--tenue); }
+.tarjeta.cerrada .t-b { color: var(--tenue); }
+.tarjeta.cerrada .t-pie { color: var(--suave); }
+.tarjeta.cerrada .t-pie::before { content: "🔒 "; }
+
+.nota { color: var(--suave); font-size: 13.5px; margin: 18px 2px 0; }
+
+.otras { margin-top: 42px; border-top: 1px solid var(--linea); padding-top: 22px; }
+.rotulo { font: 600 11px/1 var(--cond); letter-spacing: 2px; text-transform: uppercase; color: var(--suave); margin: 0 0 12px; }
+.enlaces { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.enlaces a { color: var(--suave); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+.enlaces a:hover { color: var(--acento); }
+
+/* ---------- acceso ---------- */
+.acceso { position: fixed; inset: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 24px; overflow: auto; }
+.acceso-card { width: min(360px, 100%); display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--linea); border-radius: 14px; padding: 26px; }
+.acceso-t { font: 600 26px/1 var(--cond); letter-spacing: 1px; margin: 0; }
+.acceso-h { color: var(--suave); font-size: 13.5px; margin: 0 0 8px; }
+.acceso-card label { font: 600 11px/1 var(--cond); letter-spacing: 1.6px; text-transform: uppercase; color: var(--suave); margin-top: 6px; }
+.campo { width: 100%; background: var(--bg2); border: 1px solid var(--linea); border-radius: 9px; color: var(--texto); font: 400 15px var(--sans); padding: 11px 13px; }
+.campo:focus { outline: none; border-color: var(--acento); }
+.acceso-card .btn-lleno { margin-top: 14px; }
+.acceso-aviso { margin: 10px 0 0; font-size: 13px; border-radius: 8px; padding: 9px 12px; background: color-mix(in srgb, var(--alerta) 14%, transparent); color: var(--alerta); }
+.acceso-aviso.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.acceso-pie { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.enlace { background: none; border: 0; padding: 0; cursor: pointer; color: var(--suave); font: 500 12.5px var(--sans); text-decoration: underline; text-underline-offset: 3px; }
+.enlace:hover { color: var(--acento); }
+
+@media (max-width: 560px) {
+  .cab-in { padding: 14px 16px; }
+  .hoja { padding: 28px 16px 48px; }
+  .sesion-q { display: none; }
+}

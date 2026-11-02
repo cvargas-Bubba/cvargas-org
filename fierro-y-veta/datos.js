@@ -7,7 +7,7 @@ window.SITIO = {
   /* ---------- quién eres ---------- */
   nombre: "Fierro & Veta",             // el nombre que va arriba y en la pestaña
   oficio: "Muebles a pedido",          // la línea chica al lado del nombre
-  logo: "marca/fv-monograma.png",      // deja "" si prefieres solo el nombre escrito
+  logo: "../marca/fv-monograma.png",      // deja "" si prefieres solo el nombre escrito
   titular: "Muebles a pedido, en madera y fierro",
   bajada: "Cada mueble se hace a la medida del espacio: cocinas, closets, " +
           "libreros y mesones de madera maciza, con estructura de fierro cuando " +
@@ -35,25 +35,12 @@ window.SITIO = {
   ],
 
   /* ---------- herramientas ----------
+     Esta es la página del taller: acá va lo que le sirve a un cliente. El
+     resto de las aplicaciones vive en el índice, en cvargas.org.
      Cambia `mostrar` a false para sacar alguna de la página. */
   apps: [
-    { nombre: "Cotizador de muebles", url: "muebles/",
+    { nombre: "Cotizador de muebles", url: "../muebles/",
       texto: "Calcula el precio, el despiece y la lista de compra desde las medidas del mueble.",
-      mostrar: true },
-    { nombre: "Cotizador de vidriería", url: "https://cvargas-bubba.github.io/cotizador-vidrieria/",
-      texto: "Ventanas, shower doors, espejos y barandas, con esquema y PDF.",
-      mostrar: true },
-    { nombre: "Conversor DXF a KML", url: "https://cvargas-bubba.github.io/conversor-dxf-kml/",
-      texto: "Pasa planos de AutoCAD a Google Earth.",
-      mostrar: true },
-    { nombre: "Patio de áridos", url: "https://cvargas-bubba.github.io/patio-de-aridos/",
-      texto: "Prototipo de venta de áridos, con vista de cliente y panel del vendedor.",
-      mostrar: true },
-    { nombre: "Transcriptor", url: "https://cvargas-bubba.github.io/transcriptor/",
-      texto: "Graba o sube audio, lo transcribe y lo resume.",
-      mostrar: false },
-    { nombre: "Cuentas claras", url: "https://cvargas-bubba.github.io/cuentas-claras/",
-      texto: "Registra ingresos, gastos y metas de ahorro.",
-      mostrar: false }
+      mostrar: true }
   ]
 };
