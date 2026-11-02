@@ -20,13 +20,34 @@ MQ.dec = (n, d) => (Math.round(n * Math.pow(10, d == null ? 2 : d)) / Math.pow(1
    `lineal` marca las que se cargan como largo × número de piezas: en vez de
    calcular los metros a mano, se anota el corte tal como se va a pedir. */
 MQ.UNIDADES = {
-  m: { nombre: "m", largo: "metro", lineal: true },
-  m2: { nombre: "m²", largo: "metro cuadrado" },
+  m: { nombre: "m", largo: "metro", lineal: true, compra: "tira", compras: "tiras" },
+  m2: { nombre: "m²", largo: "metro cuadrado", compra: "plancha", compras: "planchas", superficie: true },
   un: { nombre: "un.", largo: "unidad" },
   plancha: { nombre: "plancha", largo: "plancha" },
   hora: { nombre: "hora", largo: "hora" },
   global: { nombre: "global", largo: "monto fijo" }
 };
+
+/* ---------- lo que rinde una compra ----------
+   La madera no se compra por metro sino en tiras de 3,2 m, y el fierro en
+   tiras de 6 m; un tablero se compra por plancha pero entra al mueble por
+   metro cuadrado. `rinde` dice cuánto de la unidad del ítem entrega una
+   compra, así el precio que uno anota es el de la tira o la plancha —el que
+   le cobran— y el metro sale de ahí. Sin `rinde`, el precio es por unidad,
+   como antes. */
+MQ.rinde = function (it) {
+  if (!it) return 1;
+  const u = MQ.UNIDADES[it.unidad] || {};
+  if (u.superficie && MQ.num(it.plAncho, 0) > 0 && MQ.num(it.plLargo, 0) > 0) {
+    return (MQ.num(it.plAncho, 0) / 1000) * (MQ.num(it.plLargo, 0) / 1000);
+  }
+  const r = MQ.num(it.rinde, 0);
+  return r > 0 ? r : 1;
+};
+/* el precio de una unidad: del metro, del metro cuadrado, de la hora */
+MQ.precioUnidad = (it) => MQ.num(it && it.precio, 0) / MQ.rinde(it);
+/* cuánto se pierde en cortes y despuntes, en tanto por uno */
+MQ.perdidaDe = (it) => Math.max(0, MQ.num(it && it.perdida, 0)) / 100;
 
 /* `corteLargo`: en una figura cerrada, este material se cuenta por el lado
    mayor y no por el contorno. Un rectángulo de 1000 × 300 es un marco de
@@ -48,26 +69,26 @@ MQ.CORTES = { contorno: "Contorno: los lados", largo: "Largo: el lado mayor" };
    En la madera, esp y anc van en pulgadas y arman el nombre: 2×4". */
 MQ.DEFAULT_CATALOGO = {
   items: [
-    { id: "m1x4", cat: "madera", nombre: "Pino seco cepillado", esp: 1, anc: 4, unidad: "m", precio: 1290 },
-    { id: "m1x6", cat: "madera", nombre: "Pino seco cepillado", esp: 1, anc: 6, unidad: "m", precio: 1890 },
-    { id: "m1x8", cat: "madera", nombre: "Pino seco cepillado", esp: 1, anc: 8, unidad: "m", precio: 2490 },
-    { id: "m2x2", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 2, unidad: "m", precio: 1490 },
-    { id: "m2x4", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 4, unidad: "m", precio: 2690 },
-    { id: "m2x6", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 6, unidad: "m", precio: 3890 },
-    { id: "m2x8", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 8, unidad: "m", precio: 5190 },
+    { id: "m1x4", cat: "madera", nombre: "Pino seco cepillado", esp: 1, anc: 4, unidad: "m", rinde: 3.2, precio: 4130 },
+    { id: "m1x6", cat: "madera", nombre: "Pino seco cepillado", esp: 1, anc: 6, unidad: "m", rinde: 3.2, precio: 6050 },
+    { id: "m1x8", cat: "madera", nombre: "Pino seco cepillado", esp: 1, anc: 8, unidad: "m", rinde: 3.2, precio: 7970 },
+    { id: "m2x2", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 2, unidad: "m", rinde: 3.2, precio: 4770 },
+    { id: "m2x4", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 4, unidad: "m", rinde: 3.2, precio: 8610 },
+    { id: "m2x6", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 6, unidad: "m", rinde: 3.2, precio: 12450 },
+    { id: "m2x8", cat: "madera", nombre: "Pino seco cepillado", esp: 2, anc: 8, unidad: "m", rinde: 3.2, precio: 16610 },
 
-    { id: "f30", cat: "perfil", nombre: "Tubo cuadrado 30×30×2 mm", unidad: "m", precio: 2690 },
-    { id: "f40", cat: "perfil", nombre: "Tubo cuadrado 40×40×2 mm", unidad: "m", precio: 3490 },
-    { id: "f5020", cat: "perfil", nombre: "Tubo rectangular 50×20×2 mm", unidad: "m", precio: 3190 },
-    { id: "fang", cat: "perfil", nombre: "Ángulo 40×40×3 mm", unidad: "m", precio: 3890 },
-    { id: "fplat", cat: "perfil", nombre: "Pletina 38×3 mm", unidad: "m", precio: 2290 },
+    { id: "f30", cat: "perfil", nombre: "Tubo cuadrado 30×30×2 mm", unidad: "m", rinde: 6, precio: 16140 },
+    { id: "f40", cat: "perfil", nombre: "Tubo cuadrado 40×40×2 mm", unidad: "m", rinde: 6, precio: 20940 },
+    { id: "f5020", cat: "perfil", nombre: "Tubo rectangular 50×20×2 mm", unidad: "m", rinde: 6, precio: 19140 },
+    { id: "fang", cat: "perfil", nombre: "Ángulo 40×40×3 mm", unidad: "m", rinde: 6, precio: 23340 },
+    { id: "fplat", cat: "perfil", nombre: "Pletina 38×3 mm", unidad: "m", rinde: 6, precio: 13740 },
 
-    { id: "mel18b", cat: "tablero", nombre: "Melamina blanca 18 mm", unidad: "plancha", precio: 38900 },
-    { id: "mel18m", cat: "tablero", nombre: "Melamina madera 18 mm", unidad: "plancha", precio: 46900 },
-    { id: "mel15b", cat: "tablero", nombre: "Melamina blanca 15 mm", unidad: "plancha", precio: 34900 },
-    { id: "mdf18", cat: "tablero", nombre: "MDF crudo 18 mm", unidad: "plancha", precio: 32900 },
-    { id: "ter15", cat: "tablero", nombre: "Terciado 15 mm", unidad: "plancha", precio: 28900 },
-    { id: "tras3", cat: "tablero", nombre: "Trasera melamina 3 mm", unidad: "plancha", precio: 12900 },
+    { id: "mel18b", cat: "tablero", nombre: "Melamina blanca 18 mm", unidad: "m2", plAncho: 1520, plLargo: 2440, perdida: 10, precio: 38900 },
+    { id: "mel18m", cat: "tablero", nombre: "Melamina madera 18 mm", unidad: "m2", plAncho: 1520, plLargo: 2440, perdida: 10, precio: 46900 },
+    { id: "mel15b", cat: "tablero", nombre: "Melamina blanca 15 mm", unidad: "m2", plAncho: 1520, plLargo: 2440, perdida: 10, precio: 34900 },
+    { id: "mdf18", cat: "tablero", nombre: "MDF crudo 18 mm", unidad: "m2", plAncho: 1520, plLargo: 2440, perdida: 10, precio: 32900 },
+    { id: "ter15", cat: "tablero", nombre: "Terciado 15 mm", unidad: "m2", plAncho: 1520, plLargo: 2440, perdida: 10, precio: 28900 },
+    { id: "tras3", cat: "tablero", nombre: "Trasera melamina 3 mm", unidad: "m2", plAncho: 1520, plLargo: 2440, perdida: 10, precio: 12900 },
 
     { id: "bisagra", cat: "herraje", nombre: "Bisagra con amortiguación", unidad: "un", precio: 2690 },
     { id: "corredera", cat: "herraje", nombre: "Corredera cierre suave (juego)", unidad: "un", precio: 9900 },

@@ -114,6 +114,7 @@
             <select class="select" id="crMat" aria-label="Material de la figura"></select>
             <div class="unit" data-unit="pzas"><input class="input" id="crPiezas" inputmode="numeric" value="1" aria-label="Piezas iguales"></div>
             <select class="select" id="crCorte" aria-label="Cómo se cuenta la figura" hidden></select>
+            <label class="check" id="crAcoteBox" hidden><input type="checkbox" id="crAcote"><span>Con medida</span></label>
             <span class="mat-calc mono" id="crMatCalc"></span>
             <button class="btn btn-ghost btn-sm" id="crMedida">Cambiar medida</button>
           </div>
@@ -248,9 +249,11 @@
     <div class="panel-h"><h2 class="h-label">Catálogo</h2><button class="btn btn-ghost btn-sm" id="addItem">Agregar ítem</button></div>
     <div class="panel-b">
       <div class="tbl-wrap"><table class="tbl" id="tblItems"><thead><tr>
-        <th>Categoría</th><th>Nombre</th><th>Esp.</th><th>Ancho</th><th>Unidad</th><th>Precio</th><th class="der">Copiar · Quitar</th>
+        <th>Categoría</th><th>Nombre</th><th>Esp.</th><th>Ancho</th><th>Unidad</th><th>Se compra en</th><th>Precio de eso</th><th>Pérdida</th><th class="der">Copiar · Quitar</th>
       </tr></thead><tbody></tbody></table></div>
-      <p class="hint">Espesor y ancho, en pulgadas, son solo para la madera dimensionada: arman el nombre de la escuadría.</p>
+      <p class="hint">Espesor y ancho, en pulgadas, son solo para la madera dimensionada: arman el nombre de la escuadría.
+        En «se compra en» va el largo de la tira —3,2 m la madera, 6 m el fierro— o las medidas de la plancha, y el precio es el de esa tira o esa plancha: el valor del metro sale de ahí.
+        La pérdida es el despunte que igual se paga; se suma a la cantidad, no a los cortes.</p>
     </div>
   </section>
 

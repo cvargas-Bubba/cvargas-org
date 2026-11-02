@@ -96,6 +96,19 @@
           `<option value="${k}"${todasIgual && k === modo ? " selected" : ""}>${esc(MQ.CORTES[k])}</option>`).join("");
     }
 
+    /* qué figuras llevan su medida escrita. Sin tocar nada siguen al croquis;
+       acá se decide figura por figura, que es lo que pide un dibujo con
+       muchas piezas iguales: la medida en una sola. */
+    const acotables = os.filter((x) => x.t !== "cota");
+    $("crAcoteBox").hidden = !acotables.length;
+    if (acotables.length) {
+      const global = partida().croquis.acotar !== false;
+      const efectivo = (x) => (x.acotar == null ? global : !!x.acotar);
+      const uno = efectivo(acotables[0]);
+      $("crAcote").indeterminate = !acotables.every((x) => efectivo(x) === uno);
+      $("crAcote").checked = uno;
+    }
+
     let q;
     if (varias) {
       q = os.length + " figuras · " + MQ.dec(metros, 2) + " m";
@@ -660,18 +673,34 @@
       let cabecera = "";
       if (it.cat !== grupo) {
         grupo = it.cat;
-        cabecera = `<tr class="grupo"><td colspan="7">${esc(MQ.categoria(grupo).nombre)}</td></tr>`;
+        cabecera = `<tr class="grupo"><td colspan="9">${esc(MQ.categoria(grupo).nombre)}</td></tr>`;
       }
+      /* «Se compra en»: el largo de la tira o las medidas de la plancha. De
+         ahí sale el precio del metro, que es lo que se muestra debajo. */
+      const u = MQ.UNIDADES[it.unidad] || {};
+      let compra = "";
+      if (u.superficie) {
+        compra = `<div class="plancha">${inp(it.plAncho == null ? "" : it.plAncho, "plAncho", i, 'inputmode="numeric" placeholder="ancho"')}
+          <span>×</span>${inp(it.plLargo == null ? "" : it.plLargo, "plLargo", i, 'inputmode="numeric" placeholder="largo"')}<span>mm</span></div>`;
+      } else if (u.compra) {
+        compra = `<div class="unit" data-unit="m">${inp(it.rinde == null ? "" : it.rinde, "rinde", i, 'inputmode="decimal" placeholder="tira"')}</div>`;
+      }
+      const rinde = MQ.rinde(it);
+      const porUnidad = u.compra && rinde > 1
+        ? `<span class="cell-nota mono">${MQ.clp(MQ.precioUnidad(it))} / ${esc(u.nombre)}</span>` : "";
+
       return cabecera + `<tr>
         <td class="w140"><select class="select cell" data-campo="cat" data-i="${i}">${MQ.CATEGORIAS.map((c) =>
           `<option value="${c.id}"${c.id === it.cat ? " selected" : ""}>${esc(c.nombre)}</option>`).join("")}</select></td>
         <td>${inp(it.nombre, "nombre", i)}</td>
         <td class="w70">${esMadera ? inp(it.esp == null ? "" : it.esp, "esp", i, 'inputmode="decimal"') : ""}</td>
         <td class="w70">${esMadera ? inp(it.anc == null ? "" : it.anc, "anc", i, 'inputmode="decimal"') : ""}</td>
-        <td class="w110"><select class="select cell" data-campo="unidad" data-i="${i}">${Object.keys(MQ.UNIDADES).map((u) =>
-          `<option value="${u}"${u === it.unidad ? " selected" : ""}>${esc(MQ.UNIDADES[u].largo)}</option>`).join("")}</select></td>
-        <td class="w110">${inp(it.precio, "precio", i, 'inputmode="numeric"')}</td>
-        <td class="w70 it-acc">
+        <td class="w110"><select class="select cell" data-campo="unidad" data-i="${i}">${Object.keys(MQ.UNIDADES).map((u2) =>
+          `<option value="${u2}"${u2 === it.unidad ? " selected" : ""}>${esc(MQ.UNIDADES[u2].largo)}</option>`).join("")}</select></td>
+        <td class="w140">${compra}</td>
+        <td class="w110">${inp(it.precio, "precio", i, 'inputmode="numeric"')}${porUnidad}</td>
+        <td class="w70">${u.compra || u.superficie ? `<div class="unit" data-unit="%">${inp(it.perdida == null ? "" : it.perdida, "perdida", i, 'inputmode="decimal"')}</div>` : ""}</td>
+        <td class="w70 it-acc" colspan="1">
           <button class="icon" data-dup-item="${i}" title="Duplicar para modificarlo" aria-label="Duplicar ítem">⧉</button>
           <button class="icon" data-del-item="${i}" title="Quitar" aria-label="Quitar ítem">✕</button>
         </td>
@@ -695,7 +724,13 @@
          el botón de quitar. */
       if (campo === "nombre") it.nombre = el.value.trim() || it.nombre;
       else if (campo === "cat" || campo === "unidad") it[campo] = el.value;
-      else it[campo] = Math.max(0, MQ.num(el.value, 0));
+      else if (campo === "precio") it.precio = Math.max(0, MQ.num(el.value, 0));
+      else {
+        /* los opcionales se van si quedan en blanco: un cero escrito no es lo
+           mismo que un campo vacío, y en blanco significa "no aplica" */
+        const v = el.value.trim();
+        if (v === "") delete it[campo]; else it[campo] = Math.max(0, MQ.num(v, 0));
+      }
     });
     cat.params = {
       gastos: Math.max(0, MQ.num($("pGastos").value, 0)),
@@ -892,6 +927,10 @@
       croquis.asignar($("crMat").value, undefined); pintarBarraMaterial();
     });
     $("crPiezas").addEventListener("input", () => { croquis.asignar(undefined, $("crPiezas").value); pintarBarraMaterial(); });
+    $("crAcote").addEventListener("change", () => {
+      croquis.acotar($("crAcote").checked);
+      pintarBarraMaterial();
+    });
     $("crCorte").addEventListener("change", () => {
       if ($("crCorte").value === "=") return;
       croquis.corte($("crCorte").value);

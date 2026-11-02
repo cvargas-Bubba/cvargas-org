@@ -349,8 +349,12 @@ MQ.pdf = (function () {
       /* los cortes pueden ser varios por ítem: se les deja una segunda línea
          antes de recortarlos, porque es con esto que se va al banco */
       let extra = 0;
-      if (g.cortes.length) {
-        const t = doc.splitTextToSize(g.cortes.map((x) => x.piezas + " de " + x.largo).join(" · "), 60).slice(0, 2);
+      /* primero qué hay que comprar —tiras o planchas enteras— y después los
+         cortes que salen de ahí */
+      const detalle = (g.compras ? [g.compras + " " + g.compraNombre + " de " + MQ.dec(g.rinde, 2) + " " + (MQ.UNIDADES[g.unidad] || {}).nombre] : [])
+        .concat(g.cortes.map((x) => x.piezas + " de " + x.largo));
+      if (detalle.length) {
+        const t = doc.splitTextToSize(detalle.join(" · "), 60).slice(0, 2);
         doc.text(t, 124, y);
         extra = (t.length - 1) * 3.4;
       }

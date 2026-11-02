@@ -8,13 +8,23 @@ MQ.calc = (function () {
   const item = (cat, id) => (cat.items || []).find((x) => x.id === id);
   const esLineal = (it) => !!(it && MQ.UNIDADES[it.unidad] && MQ.UNIDADES[it.unidad].lineal);
 
-  /* Cantidad real de una línea, en la unidad del ítem.
-     En los lineales sale de los cortes: largo × piezas. */
+  /* Cantidad neta de una línea, en la unidad del ítem: lo que entra al
+     mueble. En los lineales sale de los cortes: largo × piezas. */
   function cantidad(l, it) {
     if (esLineal(it)) {
       return (Math.max(0, MQ.num(l.largo, 0)) / 1000) * Math.max(0, Math.round(MQ.num(l.piezas, 0)));
     }
     return Math.max(0, MQ.num(l.cant, 0));
+  }
+
+  /* Lo que hay que comprar y lo que cuesta. La pérdida se suma acá y no en
+     los cortes: los cortes son los del plano, la pérdida es el despunte que
+     igual se paga. El precio del ítem es el de lo que se compra —la tira, la
+     plancha— y el de la unidad sale de lo que rinde. */
+  function valorizar(neto, it) {
+    const cant = Math.max(0, neto) * (1 + MQ.perdidaDe(it));
+    const precio = MQ.precioUnidad(it);
+    return { neto: Math.max(0, neto), cant, precio, total: cant * precio };
   }
 
   /* Cómo se cuenta una figura cerrada: por el contorno o por su lado mayor.
@@ -41,15 +51,13 @@ MQ.calc = (function () {
       const largo = Math.round(MQ.croquis.largoMm(o, mm, modo));
       const piezas = MQ.croquis.piezasDe(o);
       if (largo <= 0) return;
-      out.push({
+      out.push(Object.assign({
         id: "cro:" + o.id, itemId: it.id, cat: it.cat, origen: "croquis", vista: v.nombre,
         nombre: MQ.nombreItem(it), unidad: it.unidad, lineal: true,
         largo, piezas, nota: "", modo,
         /* los lados por separado: el marco se compra entero pero se corta así */
-        cortes: MQ.croquis.ladosMm(o, mm, modo).map((x) => ({ largo: x.largo, piezas: x.piezas * piezas })),
-        cant: (largo / 1000) * piezas, precio: it.precio,
-        total: (largo / 1000) * piezas * MQ.num(it.precio, 0)
-      });
+        cortes: MQ.croquis.ladosMm(o, mm, modo).map((x) => ({ largo: x.largo, piezas: x.piezas * piezas }))
+      }, valorizar((largo / 1000) * piezas, it)));
     }));
     return out;
   }
@@ -79,6 +87,7 @@ MQ.calc = (function () {
         return;
       }
       g.piezas += l.piezas; g.cant += l.cant; g.total += l.total; g.juntas++;
+      if (l.neto != null) g.neto = (g.neto || 0) + l.neto;
       cortesDe(l).forEach((x) => {
         const y = g.cortes.find((z) => z.largo === x.largo);
         if (y) y.piezas += x.piezas; else g.cortes.push({ largo: x.largo, piezas: x.piezas });
@@ -104,15 +113,13 @@ MQ.calc = (function () {
     const aMano = (p.lineas || []).map((l) => {
       const it = item(cat, l.itemId);
       if (!it) return null;
-      const cant = cantidad(l, it);
-      return {
+      return Object.assign({
         id: l.id, itemId: it.id, cat: it.cat,
         nombre: MQ.nombreItem(it),
         unidad: it.unidad, lineal: esLineal(it),
         largo: Math.round(MQ.num(l.largo, 0)), piezas: Math.round(MQ.num(l.piezas, 0)),
-        nota: l.nota || "",
-        cant, precio: it.precio, total: cant * MQ.num(it.precio, 0), origen: "mano"
-      };
+        nota: l.nota || "", origen: "mano"
+      }, valorizar(cantidad(l, it), it));
     }).filter(Boolean);
     /* las del croquis van primero —son el cuerpo del mueble— y en el orden
        en que se dibujaron, que es como uno las repasa */
@@ -170,9 +177,10 @@ MQ.calc = (function () {
       c.lineas.forEach((l) => {
         const g = acum[l.itemId] || (acum[l.itemId] = {
           itemId: l.itemId, cat: l.cat, nombre: l.nombre, unidad: l.unidad,
-          lineal: l.lineal, cant: 0, total: 0, cortes: []
+          lineal: l.lineal, cant: 0, neto: 0, total: 0, cortes: []
         });
         g.cant += l.cant * c.cantidad;
+        g.neto += (l.neto == null ? l.cant : l.neto) * c.cantidad;
         g.total += l.total * c.cantidad;
         cortesDe(l).forEach((x) => {
           const corte = g.cortes.find((y) => y.largo === x.largo);
@@ -182,7 +190,19 @@ MQ.calc = (function () {
       });
     });
     const lista = Object.keys(acum).map((k) => acum[k]);
-    lista.forEach((g) => g.cortes.sort((a, b) => b.largo - a.largo));
+    lista.forEach((g) => {
+      g.cortes.sort((a, b) => b.largo - a.largo);
+      /* lo que hay que ir a comprar: tiras o planchas enteras, porque en la
+         barraca no venden 2,4 metros de una tira de 3,2 */
+      const it = item(cat, g.itemId);
+      const rinde = MQ.rinde(it);
+      const u = MQ.UNIDADES[g.unidad] || {};
+      if (rinde > 1 && u.compra) {
+        g.rinde = rinde;
+        g.compras = Math.ceil(Math.round(g.cant / rinde * 1000) / 1000);
+        g.compraNombre = g.compras === 1 ? u.compra : u.compras;
+      }
+    });
     /* ordenada como está el catálogo, para que se lea siempre igual */
     const orden = MQ.CATEGORIAS.map((c) => c.id);
     lista.sort((a, b) => orden.indexOf(a.cat) - orden.indexOf(b.cat) || a.nombre.localeCompare(b.nombre));
@@ -197,5 +217,5 @@ MQ.calc = (function () {
     return MQ.dec(cant, entero ? 0 : 2) + " " + u.nombre;
   }
 
-  return { costear, totales, listaCompra, lineasCroquis, cantidad, esLineal, item, conUnidad, cortesDe, textoCorte, agruparLineas, modoCorte, pagado, pagos };
+  return { costear, totales, listaCompra, lineasCroquis, cantidad, valorizar, esLineal, item, conUnidad, cortesDe, textoCorte, agruparLineas, modoCorte, pagado, pagos };
 })();

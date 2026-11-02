@@ -228,10 +228,15 @@ MQ.croquis = (function () {
     }
 
     const mm = mmPorUnidad(croquis);
-    const acotar = croquis.acotar !== false;
+    /* El acotado automático se decide por croquis, pero cada figura puede
+       decir otra cosa: en un dibujo con muchas piezas iguales uno quiere la
+       medida en una sola, y a veces solo en un par de figuras de todas. */
+    const acotarTodo = croquis.acotar !== false;
+    const acota = (o) => (o.acotar == null ? acotarTodo : !!o.acotar);
+
     /* medida de la figura, escrita dentro, sin tener que dibujar la cota */
     const acote = (o) => {
-      if (!acotar) return;
+      if (!acota(o)) return;
       /* cuántas piezas iguales van, que es lo único del material que vale la
          pena escribir sobre la figura: el resto lo dice el color */
       const p = piezasDe(o);
@@ -743,6 +748,15 @@ MQ.croquis = (function () {
         sel = objetos().filter((o) => o.mat === id).map((o) => o.id);
         hover = null; pintar(); alCambiar();
         return sel.length;
+      },
+      /* qué figuras llevan su medida escrita: null sigue al croquis */
+      acotar(v) {
+        const os = elegidos().filter((o) => o.t !== "texto" && o.t !== "cota");
+        if (!os.length) return false;
+        guardar();
+        os.forEach((o) => { if (v == null) delete o.acotar; else o.acotar = !!v; });
+        pintar(); alCambiar();
+        return true;
       },
       /* cómo se cuenta una figura cerrada, cuando el material no acierta */
       corte(modo) {

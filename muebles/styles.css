@@ -293,7 +293,13 @@ img, svg { max-width: 100%; }
 .tbl .grupo td { font: 600 10.5px/1 var(--cond); letter-spacing: 1.2px; text-transform: uppercase; color: var(--acento); padding: 16px 8px 6px; border-bottom: 1px solid color-mix(in srgb, var(--acento) 30%, var(--linea)); }
 .tbl tr:first-child .grupo td, .tbl .grupo:first-child td { padding-top: 4px; }
 .it-acc { white-space: nowrap; text-align: right; }
-#tblItems { min-width: 760px; }
+#tblItems { min-width: 1040px; }
+/* las dos medidas de la plancha, que juntas dan el metro cuadrado */
+.plancha { display: flex; align-items: center; gap: 4px; }
+.plancha .cell { min-width: 0; }
+.plancha span { color: var(--tenue); font-size: 11.5px; }
+/* el precio de la unidad, calculado: va bajo el precio que uno anota */
+.cell-nota { display: block; color: var(--suave); font-size: 11.5px; padding: 3px 2px 0; }
 
 .params-grid, .company-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
 .company-grid .full { grid-column: 1 / -1; }
