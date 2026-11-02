@@ -12,6 +12,7 @@ tarjetas de cada módulo y el ingreso. Sitio estático, sin framework ni build.
 | `muebles/` | cvargas.org/muebles | el cotizador de muebles (privado) |
 | `dxf-kml/` | cvargas.org/dxf-kml | conversor de planos DXF a KML |
 | `aridos/` | cvargas.org/aridos | prototipo de venta de áridos |
+| `cuentas/` | cvargas.org/cuentas | ingresos, gastos y metas de ahorro |
 | `marca/` | | el logo, compartido por todo el sitio |
 
 Las rutas distinguen mayúsculas: `cvargas.org/muebles` funciona y
@@ -22,12 +23,23 @@ lista `MODULOS` de [`indice.js`](indice.js). Un solo repositorio, un solo
 certificado y un solo despliegue; la contra es que un cambio en cualquier
 módulo reconstruye el sitio entero.
 
-`dxf-kml/` y `aridos/` son **copias** de sus repositorios
+`dxf-kml/`, `aridos/` y `cuentas/` son **copias** de sus repositorios
 ([conversor-dxf-kml](https://github.com/cvargas-Bubba/conversor-dxf-kml),
-[patio-de-aridos](https://github.com/cvargas-Bubba/patio-de-aridos)): son
-páginas de un solo archivo y se trajeron tal cual para que vivan en este
-dominio. Si se edita el repositorio original, hay que volver a copiar el
-`index.html`; lo que manda en cvargas.org es la copia de acá.
+[patio-de-aridos](https://github.com/cvargas-Bubba/patio-de-aridos),
+[cuentas-claras](https://github.com/cvargas-Bubba/cuentas-claras)): se
+trajeron tal cual para que vivan en este dominio. Si se edita el repositorio
+original, hay que volver a copiar los archivos; lo que manda en cvargas.org es
+la copia de acá.
+
+`cuentas/` es una app instalable: además del `index.html` trae su
+`manifest.webmanifest`, su `sw.js` y sus íconos. Todas sus rutas internas son
+relativas, así que funciona desde cualquier carpeta sin tocarle nada, y su
+service worker solo manda dentro de `/cuentas/`.
+
+**Cuentas claras tiene su propia cuenta**, en el proyecto de Firebase
+`cuentas-claras-a1f9a`, distinta de la del cotizador: entrar en cvargas.org no
+abre esa sesión y viceversa. Para que su ingreso funcionara desde acá hubo que
+agregar `cvargas.org` a los dominios autorizados de **ese** proyecto también.
 
 ## El ingreso
 

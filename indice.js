@@ -30,14 +30,22 @@ const MODULOS = [
     bajada: "Prototipo",
     texto: "Venta de áridos, con vista de cliente y panel del vendedor.",
     url: "aridos/"
+  },
+  {
+    /* tiene cuenta propia, así que el candado acá solo esconde la puerta:
+       adentro igual pide su correo y su contraseña */
+    nombre: "Cuentas claras",
+    bajada: "Cuenta aparte",
+    texto: "Ingresos, gastos y metas de ahorro. Se instala en el teléfono.",
+    url: "cuentas/",
+    privada: true
   }
 ];
 
 /* Lo que vive en otro lado y se enlaza nomás. */
 const OTRAS = [
   { nombre: "Cotizador de vidriería", url: "https://cvargas-bubba.github.io/cotizador-vidrieria/" },
-  { nombre: "Transcriptor", url: "https://cvargas-bubba.github.io/transcriptor/" },
-  { nombre: "Cuentas claras", url: "https://cvargas-bubba.github.io/cuentas-claras/" }
+  { nombre: "Transcriptor", url: "https://cvargas-bubba.github.io/transcriptor/" }
 ];
 
 /* ────────────────────────── de acá para abajo, el armado ────────────────── */
