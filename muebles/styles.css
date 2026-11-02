@@ -231,6 +231,21 @@ img, svg { max-width: 100%; }
 .ley-c { width: 16px; height: 4px; border-radius: 2px; flex: none; }
 .ley b { color: var(--suave); font-weight: 500; font-size: 12px; }
 
+/* ---------- acceso ----------
+   Tapa la app entera: mientras no haya sesión no hay nada que mirar. */
+.acceso { position: fixed; inset: 0; z-index: 70; background: var(--bg); display: grid; place-items: center; padding: 24px; overflow: auto; }
+.acceso-card { width: min(380px, 100%); display: flex; flex-direction: column; gap: 14px; background: var(--panel); border: 1px solid var(--linea); border-radius: 14px; padding: 28px 26px; }
+.acceso-logo { width: 54px; height: auto; align-self: center; }
+.acceso-card .h-big { text-align: center; margin: 0; }
+.acceso-card .hint { text-align: center; margin: 0 0 4px; }
+.acceso-aviso { margin: 0; font-size: 13px; border-radius: 8px; padding: 9px 12px; background: color-mix(in srgb, var(--alerta) 14%, transparent); color: var(--alerta); }
+.acceso-aviso.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.acceso-pie { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.enlace { background: none; border: 0; padding: 0; cursor: pointer; color: var(--suave); font: 500 12.5px var(--sans); text-decoration: underline; text-underline-offset: 3px; }
+.enlace:hover { color: var(--acento); }
+button.sync { background: none; border: 0; cursor: pointer; }
+button.sync:hover { color: var(--acento); }
+
 /* ---------- aviso de arranque ---------- */
 .aviso { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; background: var(--panel); border: 1px solid color-mix(in srgb, var(--acento) 35%, var(--linea)); border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; font-size: 13.5px; }
 .aviso-a { display: flex; gap: 6px; flex-wrap: wrap; }

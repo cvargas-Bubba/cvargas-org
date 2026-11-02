@@ -112,9 +112,25 @@ MQ.store = (function () {
   const emit = (kind) => S.listeners.forEach((fn) => fn(kind));
   S.on = (fn) => S.listeners.push(fn);
 
-  S.saveCatalogo = function (c) { S.catalogo = mergeCatalogo(c); LS.set("catalogo", S.catalogo); emit("catalogo"); };
-  S.resetCatalogo = function () { S.catalogo = MQ.clone(MQ.DEFAULT_CATALOGO); LS.set("catalogo", S.catalogo); emit("catalogo"); };
-  S.saveEmpresa = function (e) { S.empresa = mergeEmpresa(e); LS.set("empresa", S.empresa); emit("empresa"); };
+  /* ---------- espejo en la nube ----------
+     Cada cosa que se guarda acá sube también, si hay sesión. Sin sesión
+     `guardar` no hace nada y todo sigue como antes: en este equipo. */
+  const subir = (tipo, id, datos) => { if (MQ.nube) MQ.nube.guardar(tipo, id, datos); };
+  const quitar = (tipo, id) => { if (MQ.nube) MQ.nube.borrar(tipo, id); };
+  const ahora = () => new Date().toISOString();
+
+  S.saveCatalogo = function (c) {
+    S.catalogo = mergeCatalogo(c); S.catalogo.actualizado = ahora();
+    LS.set("catalogo", S.catalogo); subir("catalogo", null, S.catalogo); emit("catalogo");
+  };
+  S.resetCatalogo = function () {
+    S.catalogo = MQ.clone(MQ.DEFAULT_CATALOGO); S.catalogo.actualizado = ahora();
+    LS.set("catalogo", S.catalogo); subir("catalogo", null, S.catalogo); emit("catalogo");
+  };
+  S.saveEmpresa = function (e) {
+    S.empresa = mergeEmpresa(e); S.empresa.actualizado = ahora();
+    LS.set("empresa", S.empresa); subir("empresa", null, S.empresa); emit("empresa");
+  };
 
   S.nextNumero = () => S.quotes.reduce((mx, q) => Math.max(mx, q.numero || 0), 0) + 1;
 
@@ -124,18 +140,23 @@ MQ.store = (function () {
     body.actualizado = new Date().toISOString();
     const i = S.quotes.findIndex((x) => x.id === body.id);
     if (i >= 0) S.quotes[i] = body; else S.quotes.push(body);
-    ordenar(S.quotes); LS.set("quotes", S.quotes); emit("quotes");
+    ordenar(S.quotes); LS.set("quotes", S.quotes);
+    subir("cotizaciones", body.id, body); emit("quotes");
     return body;
   };
 
   S.deleteQuote = function (id) {
-    S.quotes = S.quotes.filter((q) => q.id !== id); LS.set("quotes", S.quotes); emit("quotes");
+    S.quotes = S.quotes.filter((q) => q.id !== id); LS.set("quotes", S.quotes);
+    quitar("cotizaciones", id); emit("quotes");
   };
 
   /* Preferencias de vista de este equipo: cómo se mira la app, no datos del
      trabajo. Viven aparte para no ensuciar la cotización ni el catálogo. */
   S.prefs = LS.get("prefs") || {};
-  S.setPref = function (k, v) { S.prefs[k] = v; LS.set("prefs", S.prefs); };
+  S.setPref = function (k, v) {
+    S.prefs[k] = v; S.prefs.actualizado = ahora();
+    LS.set("prefs", S.prefs); subir("prefs", null, S.prefs);
+  };
 
   S.loadDraft = () => sanear(LS.get("draft"));
   S.saveDraft = (q) => LS.set("draft", q);
@@ -156,9 +177,10 @@ MQ.store = (function () {
   const porNombre = (a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es");
 
   S.clientes = (LS.get("clientes") || []).filter((c) => c && c.id).sort(porNombre);
-  function escribirClientes() {
+  function escribirClientes(tocado) {
     S.clientes.sort(porNombre);
     LS.set("clientes", S.clientes);
+    if (tocado) subir("clientes", tocado.id, tocado);
     emit("clientes");
   }
 
@@ -173,18 +195,19 @@ MQ.store = (function () {
     const existe = c.id && S.cliente(c.id);
     if (existe) {
       Object.assign(existe, MQ.clone(c), { actualizado: ahora });
-      escribirClientes();
+      escribirClientes(existe);
       return existe;
     }
     const body = Object.assign({ id: MQ.uid(), creado: ahora }, MQ.clone(c), { actualizado: ahora });
     S.clientes.push(body);
-    escribirClientes();
+    escribirClientes(body);
     return body;
   };
 
   S.deleteCliente = function (id) {
     S.clientes = S.clientes.filter((c) => c.id !== id);
     escribirClientes();
+    quitar("clientes", id);
   };
 
   /* los trabajos de un cliente: por vínculo, y si no por nombre, para que
@@ -202,13 +225,76 @@ MQ.store = (function () {
   S.savePlantilla = function (p) {
     const t = MQ.clone(p);
     t.id = MQ.uid();
-    t.guardado = new Date().toISOString();
+    t.guardado = ahora();
     S.plantillas.push(t);
-    LS.set("plantillas", S.plantillas); emit("plantillas");
+    LS.set("plantillas", S.plantillas); subir("plantillas", t.id, t); emit("plantillas");
   };
   S.deletePlantilla = function (id) {
     S.plantillas = S.plantillas.filter((t) => t.id !== id);
-    LS.set("plantillas", S.plantillas); emit("plantillas");
+    LS.set("plantillas", S.plantillas); quitar("plantillas", id); emit("plantillas");
+  };
+
+  /* ---------- fusión al entrar ----------
+     Lo de la nube y lo de este equipo se juntan registro por registro y gana
+     el más reciente. Lo que está solo acá sube; lo que está solo allá baja.
+     Así, la primera vez, lo que ya tenías guardado en este PC no se pierde:
+     se sube entero, porque en la nube no hay nada más nuevo. */
+  const masNuevo = (a, b) => String((a && a.actualizado) || "") >= String((b && b.actualizado) || "");
+
+  S.fusionar = async function () {
+    if (!MQ.nube || !MQ.nube.usuario()) return null;
+    const lejos = await MQ.nube.bajar();
+    if (!lejos) return null;
+    const cuenta = { subidos: 0, bajados: 0 };
+
+    /* documentos únicos: catálogo, empresa, preferencias */
+    if (lejos.sueltos.catalogo && !masNuevo(S.catalogo, lejos.sueltos.catalogo)) {
+      S.catalogo = mergeCatalogo(lejos.sueltos.catalogo);
+      S.catalogo.actualizado = lejos.sueltos.catalogo.actualizado;
+      LS.set("catalogo", S.catalogo); cuenta.bajados++; emit("catalogo");
+    } else if (S.catalogo.actualizado || !lejos.sueltos.catalogo) {
+      subir("catalogo", null, S.catalogo); cuenta.subidos++;
+    }
+    if (lejos.sueltos.empresa && !masNuevo(S.empresa, lejos.sueltos.empresa)) {
+      S.empresa = mergeEmpresa(lejos.sueltos.empresa);
+      LS.set("empresa", S.empresa); cuenta.bajados++; emit("empresa");
+    } else if (S.empresa.nombre) {
+      subir("empresa", null, S.empresa); cuenta.subidos++;
+    }
+    if (lejos.sueltos.prefs && !masNuevo(S.prefs, lejos.sueltos.prefs)) {
+      S.prefs = lejos.sueltos.prefs; LS.set("prefs", S.prefs); cuenta.bajados++;
+    }
+
+    /* listas: una pasada por registro, por id */
+    const listas = [
+      { col: "cotizaciones", arr: "quotes", aviso: "quotes" },
+      { col: "clientes", arr: "clientes", aviso: "clientes" },
+      { col: "plantillas", arr: "plantillas", aviso: "plantillas" }
+    ];
+    listas.forEach((L) => {
+      const locales = S[L.arr] || [];
+      const remotos = lejos.listas[L.col] || [];
+      const porId = {};
+      locales.forEach((x) => { porId[x.id] = { local: x }; });
+      remotos.forEach((x) => { (porId[x.id] = porId[x.id] || {}).remoto = x; });
+      const fin = [];
+      Object.keys(porId).forEach((id) => {
+        const p = porId[id];
+        if (p.local && p.remoto) {
+          if (masNuevo(p.local, p.remoto)) { fin.push(p.local); subir(L.col, id, p.local); cuenta.subidos++; }
+          else { fin.push(p.remoto); cuenta.bajados++; }
+        } else if (p.local) {
+          fin.push(p.local); subir(L.col, id, p.local); cuenta.subidos++;
+        } else {
+          fin.push(p.remoto); cuenta.bajados++;
+        }
+      });
+      S[L.arr] = L.arr === "quotes" ? ordenar(fin.map(sanear)) : fin.sort(porNombre);
+      LS.set(L.arr === "quotes" ? "quotes" : L.arr, S[L.arr]);
+      emit(L.aviso);
+    });
+
+    return cuenta;
   };
 
   return S;

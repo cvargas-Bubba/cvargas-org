@@ -1341,6 +1341,123 @@
     });
   }
 
+  /* ================= SESIÓN Y NUBE =================
+     Con sesión, todo lo que se guarda sube y al entrar se funde con lo que
+     haya en la nube. Sin sesión —o sin internet— la app trabaja contra este
+     equipo, igual que siempre: nunca te deja afuera de tus propios datos. */
+  let modoLocal = false;
+
+  function pintarSesion(estado) {
+    const b = $("sync");
+    const correo = MQ.nube ? MQ.nube.correo() : "";
+    if (estado === "sincronizando") { b.textContent = "Sincronizando…"; b.title = ""; return; }
+    if (estado === "error") { b.textContent = "Sin sincronizar"; b.title = "No se pudo hablar con la nube. Toca para reintentar."; return; }
+    if (correo) {
+      b.textContent = "En la nube · " + correo.split("@")[0];
+      b.title = "Sesión de " + correo + ". Toca para salir.";
+    } else {
+      b.textContent = "Guardado en este equipo";
+      b.title = MQ.nube && MQ.nube.disponible() ? "Sin sesión: toca para entrar con tu correo." : "Sin conexión con la nube: los datos quedan en este equipo.";
+    }
+  }
+
+  const verAcceso = (v) => { $("acceso").hidden = !v; };
+
+  function avisoAcceso(texto, ok) {
+    const p = $("accesoAviso");
+    p.hidden = !texto;
+    p.textContent = texto || "";
+    p.classList.toggle("ok", !!ok);
+  }
+
+  /* Después de fundir cambian catálogo, clientes e historial: se repintan las
+     vistas que estén a la vista y la hoja, que depende de los precios. */
+  function refrescarTodo() {
+    if (!$("view-materiales").hidden) pintarCatalogo();
+    if (!$("view-clientes").hidden) pintarClientes();
+    if (!$("view-historial").hidden) pintarHistorial();
+    if (!$("view-empresa").hidden) pintarEmpresa();
+    if (partida()) { pintarBarraMaterial(); pintarLeyenda(); pintarLineas(); }
+    pintarHoja();
+    volcarCliente();
+  }
+
+  async function sincronizar() {
+    pintarSesion("sincronizando");
+    try {
+      const c = await S.fusionar();
+      refrescarTodo();
+      pintarSesion();
+      if (c && (c.subidos || c.bajados)) {
+        const p = [];
+        if (c.bajados) p.push(c.bajados + (c.bajados === 1 ? " traído" : " traídos"));
+        if (c.subidos) p.push(c.subidos + (c.subidos === 1 ? " subido" : " subidos"));
+        MQ.toast("Sincronizado: " + p.join(" y "));
+      }
+    } catch (e) {
+      pintarSesion("error");
+      MQ.toast("No se pudo sincronizar. Seguís trabajando en este equipo.");
+    }
+  }
+
+  function montarNube() {
+    if (!MQ.nube || !MQ.nube.disponible()) { modoLocal = true; pintarSesion(); return; }
+    /* la cortina se levanta recién cuando Firebase dice si hay sesión: así no
+       se alcanza a ver la app de alguien que todavía no entró */
+    verAcceso(true);
+    $("acEntrar").disabled = true;
+    $("accesoHint").textContent = "Comprobando tu sesión…";
+
+    MQ.nube.iniciar((u, err) => {
+      $("acEntrar").disabled = false;
+      $("accesoHint").textContent = "Entra con tu correo y tu contraseña y tus cotizaciones te siguen a cualquier equipo.";
+      if (err === "sin-sdk") { modoLocal = true; verAcceso(false); pintarSesion(); return; }
+      if (!u) { verAcceso(true); pintarSesion(); return; }
+      verAcceso(false);
+      sincronizar();
+    });
+  }
+
+  function conectarAcceso() {
+    $("accesoForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const correo = $("acCorreo").value.trim(), clave = $("acClave").value;
+      if (!correo || !clave) return avisoAcceso("Escribe tu correo y tu contraseña.");
+      $("acEntrar").disabled = true;
+      avisoAcceso("");
+      const r = await MQ.nube.entrar(correo, clave);
+      $("acEntrar").disabled = false;
+      if (!r.ok) return avisoAcceso(r.error);
+      $("acClave").value = "";
+    });
+
+    $("acOlvide").addEventListener("click", async () => {
+      const correo = $("acCorreo").value.trim();
+      if (!correo) return avisoAcceso("Escribe tu correo y vuelve a tocar acá.");
+      const r = await MQ.nube.recuperar(correo);
+      avisoAcceso(r.ok ? "Te mandamos un correo para cambiar la contraseña." : r.error, r.ok);
+    });
+
+    /* la salida de emergencia: si la nube falla o uno anda sin señal, la app
+       tiene que poder abrirse igual contra lo que hay en este equipo */
+    $("acLocal").addEventListener("click", () => {
+      modoLocal = true; verAcceso(false); pintarSesion();
+      MQ.toast("Trabajando en este equipo. Lo que hagas no se sincroniza.");
+    });
+
+    $("sync").addEventListener("click", async () => {
+      if (!MQ.nube || !MQ.nube.disponible()) return MQ.toast("Sin conexión con la nube: los datos quedan en este equipo.");
+      if (MQ.nube.usuario()) {
+        if ($("sync").textContent === "Sin sincronizar") return sincronizar();
+        if (!confirm("¿Salir de la sesión? Tus datos quedan en la nube y también en este equipo.")) return;
+        await MQ.nube.salir();
+        MQ.toast("Sesión cerrada");
+        return;
+      }
+      modoLocal = false; avisoAcceso(""); verAcceso(true);
+    });
+  }
+
   /* ================= ARRANQUE =================
      La app parte en blanco, lista para cotizar. Lo que quedó a medio hacer
      no se pierde: se guarda aparte y se ofrece retomarlo, igual que abrir
@@ -1374,6 +1491,8 @@
     quote = nuevaCotizacion();
     montarCroquis();
     conectar();
+    conectarAcceso();
+    montarNube();
     volcarHoja();
     $("crAyuda").textContent = AYUDA.sel;
     seleccionarPartida(null);

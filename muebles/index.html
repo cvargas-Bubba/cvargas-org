@@ -28,9 +28,28 @@
       <button class="tab" role="tab" data-view="historial" aria-selected="false">Historial</button>
       <button class="tab" role="tab" data-view="empresa" aria-selected="false">Empresa</button>
     </nav>
-    <span class="sync">Guardado en este equipo</span>
+    <button class="sync" id="sync" title="Estado de la sesión">Guardado en este equipo</button>
   </div>
 </header>
+
+<!-- ============ ACCESO ============ -->
+<div class="acceso" id="acceso" hidden>
+  <form class="acceso-card" id="accesoForm">
+    <img class="acceso-logo" src="../marca/fv-monograma.png" alt="">
+    <h1 class="h-big">Cotizador de muebles</h1>
+    <p class="hint" id="accesoHint">Entra con tu correo y tu contraseña y tus cotizaciones te siguen a cualquier equipo.</p>
+    <div class="field"><label for="acCorreo">Correo</label>
+      <input class="input" id="acCorreo" type="email" autocomplete="username" spellcheck="false"></div>
+    <div class="field"><label for="acClave">Contraseña</label>
+      <input class="input" id="acClave" type="password" autocomplete="current-password"></div>
+    <p class="acceso-aviso" id="accesoAviso" hidden></p>
+    <button class="btn btn-primary" type="submit" id="acEntrar">Entrar</button>
+    <div class="acceso-pie">
+      <button type="button" class="enlace" id="acOlvide">Olvidé mi contraseña</button>
+      <button type="button" class="enlace" id="acLocal">Trabajar solo en este equipo</button>
+    </div>
+  </form>
+</div>
 
 <!-- ============ COTIZAR ============ -->
 <main class="view" id="view-cotizar">
@@ -385,11 +404,17 @@
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Firebase: cuenta y sincronización. Si no cargan, la app sigue andando
+     en este equipo: nube.js se da cuenta y no estorba. -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="data.js"></script>
 <script src="draw.js"></script>
 <script src="croquis.js"></script>
 <script src="calc.js"></script>
 <script src="logo.js"></script>
+<script src="nube.js"></script>
 <script src="store.js"></script>
 <script src="pdf.js"></script>
 <script src="app.js"></script>
