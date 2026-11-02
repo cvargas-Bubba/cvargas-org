@@ -153,6 +153,16 @@
       verAcceso(true);
       return;
     }
+    /* el registro es del dueño; además las reglas no se lo darían a nadie más */
+    if (!MQ.nube.esDueno()) {
+      $("panel").hidden = true;
+      $("estado").hidden = false;
+      $("estado").textContent = "Esta cuenta no puede ver el registro.";
+      verAcceso(true);
+      aviso("La cuenta " + u.email + " no tiene acceso.");
+      MQ.nube.salir();
+      return;
+    }
     verAcceso(false);
     cargar();
   });

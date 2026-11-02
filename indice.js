@@ -2,8 +2,9 @@
    LAS APLICACIONES DE cvargas.org SE EDITAN ACÁ.
    Agregar una es agregar una línea a esta lista.
 
-   `privada: true` significa que solo se abre con sesión iniciada: mientras no
-   la haya se muestra con candado y al tocarla pide entrar.
+   `privada: true` significa que la tarjeta no existe para nadie más: solo
+   aparece cuando entra el dueño del sitio. Sin sesión, o con otra cuenta,
+   la página se ve como si esas aplicaciones no estuvieran.
    ────────────────────────────────────────────────────────────────────────── */
 const MODULOS = [
   {
@@ -61,38 +62,42 @@ const OTRAS = [
   const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   const hayNube = () => !!(window.MQ && MQ.nube && MQ.nube.disponible());
-  const dentro = () => hayNube() && !!MQ.nube.usuario();
+  const correo = () => (hayNube() ? MQ.nube.correo() : "");
+  /* el dueño, no "cualquiera con una cuenta": si mañana entra un cliente,
+     la página se le ve igual que a un desconocido */
+  const esDueno = () => hayNube() && MQ.nube.esDueno();
 
   function pintar() {
-    const sesion = dentro();
-    $("tarjetas").innerHTML = MODULOS.map((m) => {
-      const cerrada = m.privada && !sesion;
-      return `<li class="tarjeta${cerrada ? " cerrada" : ""}">
-        <a href="${esc(cerrada ? "#" : m.url)}"${cerrada ? ' data-pide="1"' : ""}>
+    const mio = esDueno();
+    const lista = MODULOS.filter((m) => !m.privada || mio);
+    $("tarjetas").innerHTML = lista.map((m) => `
+      <li class="tarjeta">
+        <a href="${esc(m.url)}">
           <span class="t-cab">
             <span class="t-n">${esc(m.nombre)}</span>
             ${m.bajada ? `<span class="t-b">${esc(m.bajada)}</span>` : ""}
           </span>
           <span class="t-t">${esc(m.texto)}</span>
-          <span class="t-pie">${cerrada ? "Requiere entrar" : "Abrir"}</span>
+          <span class="t-pie">Abrir</span>
         </a>
-      </li>`;
-    }).join("");
+      </li>`).join("");
 
-    const privadas = MODULOS.filter((m) => m.privada).length;
-    $("nota").hidden = sesion || !privadas || !hayNube();
-    $("nota").textContent = privadas === 1
-      ? "Una de las aplicaciones es privada: entra con tu correo para abrirla."
-      : "Algunas aplicaciones son privadas: entra con tu correo para abrirlas.";
+    /* si entró alguien que no es el dueño, conviene decírselo: si no, ve la
+       misma página de antes y no entiende qué pasó */
+    const ajeno = !!correo() && !mio;
+    $("nota").hidden = !ajeno;
+    $("nota").textContent = ajeno
+      ? "Entraste como " + correo() + ". Esta cuenta no tiene aplicaciones acá."
+      : "";
 
     $("otrasSec").hidden = !OTRAS.length;
     $("otras").innerHTML = OTRAS.map((o) =>
       `<li><a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.nombre)}</a></li>`).join("");
 
-    const correo = hayNube() ? MQ.nube.correo() : "";
-    $("sesionQuien").hidden = !correo;
-    $("sesionQuien").textContent = correo;
-    $("btnSesion").textContent = correo ? "Salir" : "Entrar";
+    const c = correo();
+    $("sesionQuien").hidden = !c;
+    $("sesionQuien").textContent = c;
+    $("btnSesion").textContent = c ? "Salir" : "Entrar";
     $("btnSesion").hidden = !hayNube();
   }
 
@@ -104,15 +109,8 @@ const OTRAS = [
   }
 
   function conectar() {
-    $("tarjetas").addEventListener("click", (ev) => {
-      const a = ev.target.closest("[data-pide]");
-      if (!a) return;
-      ev.preventDefault();
-      verAcceso(true);
-    });
-
     $("btnSesion").addEventListener("click", async () => {
-      if (!dentro()) { aviso(""); verAcceso(true); return; }
+      if (!correo()) { aviso(""); verAcceso(true); return; }
       if (!confirm("¿Salir de la sesión?")) return;
       await MQ.nube.salir();
     });

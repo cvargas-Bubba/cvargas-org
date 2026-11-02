@@ -22,6 +22,11 @@ MQ.nube = (function () {
     appId: "1:318972385000:web:805991a36b77a9ba11db5d"
   };
 
+  /* El dueño del sitio. Lo privado es suyo y de nadie más: no basta con tener
+     una cuenta. Está acá, en un solo lugar, para que el índice, el cotizador
+     y el panel de visitas apliquen el mismo criterio. */
+  const DUENO = "cavargasm.cuentas@gmail.com";
+
   /* Qué se sincroniza y cómo se guarda. Los "sueltos" son documentos únicos
      —el catálogo, la empresa— y las "listas" son colecciones con un
      documento por registro. El borrador no entra: es el pizarrón de cada
@@ -73,6 +78,8 @@ MQ.nube = (function () {
     disponible, iniciar,
     usuario: () => usuario,
     correo: () => (usuario && usuario.email) || "",
+    esDueno: () => (((usuario && usuario.email) || "").toLowerCase() === DUENO),
+    DUENO,
 
     async entrar(correo, clave) {
       try {

@@ -48,13 +48,6 @@ img { max-width: 100%; display: block; }
 .t-t { color: var(--suave); font-size: 14.5px; }
 .t-pie { margin-top: auto; font: 600 12.5px/1 var(--sans); color: var(--acento); }
 
-/* cerrada: se ve que está, pero pide entrar */
-.tarjeta.cerrada a { border-style: dashed; }
-.tarjeta.cerrada .t-n, .tarjeta.cerrada .t-t { color: var(--tenue); }
-.tarjeta.cerrada .t-b { color: var(--tenue); }
-.tarjeta.cerrada .t-pie { color: var(--suave); }
-.tarjeta.cerrada .t-pie::before { content: "🔒 "; }
-
 .nota { color: var(--suave); font-size: 13.5px; margin: 18px 2px 0; }
 
 .otras { margin-top: 42px; border-top: 1px solid var(--linea); padding-top: 22px; }

@@ -1413,6 +1413,14 @@
       $("accesoHint").textContent = "Entra con tu correo y tu contraseña y tus cotizaciones te siguen a cualquier equipo.";
       if (err === "sin-sdk") { modoLocal = true; verAcceso(false); pintarSesion(); return; }
       if (!u) { verAcceso(true); pintarSesion(); return; }
+      /* el cotizador es del dueño: una cuenta cualquiera no entra, aunque sus
+         datos igual estarían separados por las reglas */
+      if (!MQ.nube.esDueno()) {
+        verAcceso(true);
+        avisoAcceso("La cuenta " + MQ.nube.correo() + " no tiene acceso al cotizador.");
+        MQ.nube.salir();
+        return;
+      }
       verAcceso(false);
       sincronizar();
     });
