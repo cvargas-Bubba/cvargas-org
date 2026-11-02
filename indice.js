@@ -39,6 +39,13 @@ const MODULOS = [
     texto: "Ingresos, gastos y metas de ahorro. Se instala en el teléfono.",
     url: "cuentas/",
     privada: true
+  },
+  {
+    nombre: "Visitas",
+    bajada: "Solo tuyo",
+    texto: "Quién abre cada aplicación, cuántas veces y desde dónde llegó.",
+    url: "visitas/",
+    privada: true
   }
 ];
 

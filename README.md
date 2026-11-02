@@ -13,6 +13,7 @@ tarjetas de cada módulo y el ingreso. Sitio estático, sin framework ni build.
 | `dxf-kml/` | cvargas.org/dxf-kml | conversor de planos DXF a KML |
 | `aridos/` | cvargas.org/aridos | prototipo de venta de áridos |
 | `cuentas/` | cvargas.org/cuentas | ingresos, gastos y metas de ahorro |
+| `visitas/` | cvargas.org/visitas | el registro de uso (privado) |
 | `marca/` | | el logo, compartido por todo el sitio |
 
 Las rutas distinguen mayúsculas: `cvargas.org/muebles` funciona y
@@ -53,6 +54,32 @@ La cuenta y la base de datos están en Firebase, en el proyecto
 cuida los datos son las reglas de Firestore —cada usuario lee y escribe solo lo
 suyo— y la contraseña. Los usuarios se crean a mano en la consola de Firebase,
 en Authentication → Users: el registro desde fuera está desactivado.
+
+## El registro de visitas
+
+Cada `index.html` termina con una línea:
+
+```html
+<script src="../registro.js?v=20261102c" data-app="muebles"></script>
+```
+
+Eso anota una línea en la colección `visitas` de Firestore cada vez que se
+abre la app: qué app, cuándo, un identificador al azar guardado en el
+navegador del visitante, el idioma, el tamaño de pantalla y de dónde venía el
+enlace. **No se guardan direcciones IP ni nada que identifique a la persona.**
+El identificador sirve para distinguir diez visitas de alguien de una visita de
+diez personas, nada más.
+
+Escribe por la API web de Firestore, sin cargar el SDK, para que pese poco y
+funcione también en las apps que no usan Firebase.
+
+Las reglas dejan **crear** esas líneas a cualquiera —si no, no se podrían
+registrar las visitas anónimas— pero **leerlas solo a tu correo**, y validan la
+forma del documento para que no sirva como buzón de basura. No se pueden
+modificar ni borrar desde fuera.
+
+El panel está en `visitas/`, es una tarjeta privada del índice, y resume por
+app, por día y en detalle las últimas doscientas.
 
 ## La página del taller
 
