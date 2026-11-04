@@ -37,11 +37,10 @@
     a.textContent = S.email;
     a.hidden = false;
   }
-  /* Sin ningún medio de contacto, la sección queda con el cotizador como
-     única acción. El aviso va a la consola: es para quien edita el sitio,
-     no para quien lo visita. */
+  /* El cotizador es privado, así que no sirve de respaldo para un cliente:
+     sin teléfono ni correo la sección queda sin botones. El aviso va a la
+     consola: es para quien edita el sitio, no para quien lo visita. */
   if (!tel && !S.email) {
-    $("cotizaContacto").hidden = false;
     console.info("Sitio: falta el teléfono en datos.js, por eso no aparecen los botones de WhatsApp.");
   }
 
@@ -89,5 +88,9 @@
       <span class="app-t">${esc(a.texto || "")}</span>
       <span class="app-ir">Abrir →</span>
     </a>`).join("");
-  if (!apps.length) document.getElementById("herramientas").hidden = true;
+  if (!apps.length) {
+    /* sin herramientas se va la sección y también su enlace en la barra */
+    $("herramientas").hidden = true;
+    document.querySelectorAll('a[href="#herramientas"]').forEach((a) => { a.hidden = true; });
+  }
 })();

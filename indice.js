@@ -15,7 +15,7 @@ const MODULOS = [
   {
     nombre: "Fierro & Veta",
     bajada: "Muebles a pedido",
-    texto: "El taller: trabajos, contacto y el cotizador de muebles.",
+    texto: "El taller: trabajos y contacto por WhatsApp.",
     url: "fierro-y-veta/"
   },
   {

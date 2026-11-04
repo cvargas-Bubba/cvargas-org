@@ -41,6 +41,6 @@ window.SITIO = {
   apps: [
     { nombre: "Cotizador de muebles", url: "../muebles/",
       texto: "Calcula el precio, el despiece y la lista de compra desde las medidas del mueble.",
-      mostrar: true }
+      mostrar: false }   // privado: pide cuenta, así que un cliente no puede usarlo
   ]
 };
